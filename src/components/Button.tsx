@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Icon } from "./Icon";
 
 type ButtonVariant = "primary" | "outline" | "destructive" | "secondary" | "ghost";
@@ -10,6 +11,7 @@ interface ButtonProps {
   children?: React.ReactNode;
   className?: string;
   onClick?: () => void;
+  href?: string;
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -32,14 +34,27 @@ export function Button({
   children,
   className = "",
   onClick,
+  href,
 }: ButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`font-primary inline-flex items-center justify-center gap-[6px] rounded-full px-4 py-[10px] h-10 text-sm font-medium cursor-pointer hover:opacity-90 transition-opacity ${variantClasses[variant]} ${className}`}
-    >
+  const classes = `font-primary inline-flex items-center justify-center gap-[6px] rounded-full px-4 py-[10px] h-10 text-sm font-medium cursor-pointer hover:opacity-90 transition-opacity ${variantClasses[variant]} ${className}`;
+  const content = (
+    <>
       {icon && <Icon name={icon} size={20} outlined={iconOutlined} />}
       {children && <span>{children}</span>}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={classes}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className={classes}>
+      {content}
     </button>
   );
 }

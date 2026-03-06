@@ -3,16 +3,35 @@ import { useState } from "react";
 import { BibliotecaSidebar } from "@/components/BibliotecaSidebar";
 import { Button } from "@/components/Button";
 import { Label } from "@/components/Label";
-
-const loans = [
-  { title: "Codigo Civil Comentado", code: "CIV-V01-003", person: "Juan Perez", dateOut: "15/Ene/2026", dateReturn: "15/Feb/2026" },
-  { title: "Ley Federal del Trabajo", code: "LAB-V01-005", person: "Maria Garcia", dateOut: "20/Ene/2026", dateReturn: "20/Feb/2026" },
-  { title: "Derecho Mercantil", code: "MER-V01-002", person: "Carlos Lopez", dateOut: "01/Feb/2026", dateReturn: "01/Mar/2026" },
-  { title: "Constitucion Politica", code: "CON-V01-002", person: "Ana Rodriguez", dateOut: "10/Feb/2026", dateReturn: "10/Mar/2026" },
-];
+import { InputGroup } from "@/components/InputGroup";
+import { SelectGroup } from "@/components/SelectGroup";
+import { useBibliotecaStore } from "@/store/biblioteca";
 
 export default function Prestamos() {
+  const { libros, prestamos, addPrestamo, returnPrestamo } = useBibliotecaStore();
   const [activeTab, setActiveTab] = useState("activos");
+  const [showForm, setShowForm] = useState(false);
+  const [selectedBook, setSelectedBook] = useState("");
+  const [person, setPerson] = useState("");
+  const [dateReturn, setDateReturn] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const activePrestamos = prestamos.filter((p) => !p.returned);
+  const historyPrestamos = prestamos.filter((p) => p.returned);
+  const displayed = activeTab === "activos" ? activePrestamos : historyPrestamos;
+
+  const availableBooks = libros.filter((l) => l.status === "Disponible");
+
+  function handleAddPrestamo() {
+    if (!selectedBook) { setFormError("Selecciona un libro."); return; }
+    if (!person.trim()) { setFormError("El nombre del prestatario es obligatorio."); return; }
+    if (!dateReturn.trim()) { setFormError("La fecha de devolucion es obligatoria."); return; }
+    setFormError("");
+    addPrestamo(selectedBook, person.trim(), dateReturn);
+    setSelectedBook(""); setPerson(""); setDateReturn("");
+    setShowForm(false);
+  }
+
   return (
     <div className="flex h-full bg-[var(--background)]">
       <BibliotecaSidebar active="Prestamos" />
@@ -22,15 +41,48 @@ export default function Prestamos() {
             <h1 className="font-primary text-2xl font-bold text-[var(--foreground)]">Control de Prestamos</h1>
             <p className="font-secondary text-sm text-[var(--muted-foreground)]">Gestiona los prestamos de libros</p>
           </div>
-          <Button icon="add">Nuevo Prestamo</Button>
+          <Button icon="add" onClick={() => setShowForm(!showForm)}>Nuevo Prestamo</Button>
         </div>
+
+        {/* New loan form */}
+        {showForm && (
+          <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-6 flex flex-col gap-4">
+            <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Registrar Prestamo</h2>
+            <div className="flex gap-4 flex-wrap">
+              <SelectGroup
+                label="Libro *"
+                value={selectedBook}
+                options={availableBooks.length > 0 ? availableBooks.map((b) => b.id) : ["Sin libros disponibles"]}
+                onChange={setSelectedBook}
+                className="flex-1"
+              />
+              <InputGroup label="Prestado a *" value={person} onChange={setPerson} placeholder="Nombre del prestatario" className="flex-1" />
+              <InputGroup label="Fecha de Devolucion *" value={dateReturn} onChange={setDateReturn} placeholder="dd/mmm/yyyy" className="flex-1" />
+            </div>
+            {selectedBook && availableBooks.find(b => b.id === selectedBook) && (
+              <p className="font-secondary text-xs text-[var(--muted-foreground)]">
+                Libro: {availableBooks.find(b => b.id === selectedBook)?.title}
+              </p>
+            )}
+            {formError && <p className="font-secondary text-sm text-[var(--destructive)]">{formError}</p>}
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => { setShowForm(false); setFormError(""); }}>Cancelar</Button>
+              <Button icon="save" onClick={handleAddPrestamo}>Registrar</Button>
+            </div>
+          </div>
+        )}
 
         <div className="inline-flex items-center gap-2 rounded-full bg-[var(--secondary)] p-1 h-10 w-fit">
           {["activos", "historial"].map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               className={`font-secondary rounded-full px-3 py-[6px] text-sm font-medium cursor-pointer transition-all ${
                 activeTab === tab ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm" : "text-[var(--muted-foreground)]"
-              }`}>{tab === "activos" ? "Activos" : "Historial"}</button>
+              }`}
+            >
+              {tab === "activos" ? `Activos (${activePrestamos.length})` : `Historial (${historyPrestamos.length})`}
+            </button>
           ))}
         </div>
 
@@ -40,21 +92,49 @@ export default function Prestamos() {
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[120px]">Codigo</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[150px]">Prestado a</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[120px]">Fecha Prestamo</span>
-            <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[120px]">Fecha Devolucion</span>
+            <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[120px]">Devolucion</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[100px]">Estado</span>
+            {activeTab === "activos" && (
+              <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[100px]">Accion</span>
+            )}
           </div>
-          {loans.map((loan) => (
-            <div key={loan.code} className="flex items-center px-4 py-3 border-b border-[var(--border)]">
-              <span className="font-secondary text-[13px] text-[var(--foreground)] flex-1">{loan.title}</span>
-              <span className="font-primary text-xs text-[var(--primary)] w-[120px]">{loan.code}</span>
-              <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[150px]">{loan.person}</span>
-              <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{loan.dateOut}</span>
-              <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{loan.dateReturn}</span>
-              <div className="w-[100px]"><Label variant="warning">Activo</Label></div>
+
+          {displayed.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center py-16">
+              <span className="font-secondary text-sm text-[var(--muted-foreground)]">
+                {activeTab === "activos" ? "Sin prestamos activos" : "Sin historial de prestamos"}
+              </span>
             </div>
-          ))}
+          ) : (
+            displayed.map((p) => (
+              <div key={p.id} className="flex items-center px-4 py-3 border-b border-[var(--border)]">
+                <span className="font-secondary text-[13px] text-[var(--foreground)] flex-1">{p.bookTitle}</span>
+                <span className="font-primary text-xs text-[var(--primary)] w-[120px]">{p.bookCode}</span>
+                <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[150px]">{p.person}</span>
+                <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{p.dateOut}</span>
+                <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{p.dateReturn}</span>
+                <div className="w-[100px]">
+                  <Label variant={p.returned ? "secondary" : "warning"}>
+                    {p.returned ? "Devuelto" : "Activo"}
+                  </Label>
+                </div>
+                {activeTab === "activos" && (
+                  <div className="w-[100px]">
+                    <button
+                      onClick={() => returnPrestamo(p.id)}
+                      className="font-secondary text-xs text-[var(--primary)] hover:underline cursor-pointer"
+                    >
+                      Marcar devuelto
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
           <div className="px-4 py-3">
-            <span className="font-secondary text-xs text-[var(--muted-foreground)]">Mostrando 1-4 de 12 prestamos activos</span>
+            <span className="font-secondary text-xs text-[var(--muted-foreground)]">
+              {displayed.length} prestamo{displayed.length !== 1 ? "s" : ""} {activeTab === "activos" ? "activos" : "en historial"}
+            </span>
           </div>
         </div>
       </main>

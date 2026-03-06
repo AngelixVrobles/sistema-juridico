@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sistema-juridico",
+      "runtimeExecutable": "C:/Program Files/Git/bin/bash.exe",
+      "runtimeArgs": ["-c", "cd 'C:/Users/angel/sistema-juridico' && node_modules/.bin/next dev --port 3001"],
+      "port": 3001
+    }
+  ]
+}
