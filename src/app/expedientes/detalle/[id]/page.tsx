@@ -1,21 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ExpedientesSidebar } from "@/components/ExpedientesSidebar";
-import { Button } from "@/components/Button";
-import { Label } from "@/components/Label";
-import { Icon } from "@/components/Icon";
-import { Progress } from "@/components/Progress";
-import { InputGroup } from "@/components/InputGroup";
-import { SelectGroup } from "@/components/SelectGroup";
+import { Button }             from "@/components/Button";
+import { Label }              from "@/components/Label";
+import { Icon }               from "@/components/Icon";
+import { Progress }           from "@/components/Progress";
+import { InputGroup }         from "@/components/InputGroup";
+import { SelectGroup }        from "@/components/SelectGroup";
 import { useExpedientesStore, getPaid, getPercent } from "@/store/expedientes";
+import { useToast }           from "@/context/ToastContext";
 
 const statusVariant = { Activo: "success", "En Espera": "warning", Inactivo: "error" } as const;
 
 export default function DetalleExpediente() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const store = useExpedientesStore();
+  const { id }    = useParams<{ id: string }>();
+  const router    = useRouter();
+  const store     = useExpedientesStore();
+  const toast     = useToast();
+  const fileInput = useRef<HTMLInputElement>(null);
+
   const exp = store.expedientes.find((e) => e.id === id);
 
   const [editMode,          setEditMode]          = useState(false);
@@ -34,6 +38,12 @@ export default function DetalleExpediente() {
   const [newPagoAmount, setNewPagoAmount] = useState("");
   const [newPagoDesc,   setNewPagoDesc]   = useState("Abono");
   const [newNota,       setNewNota]       = useState("");
+  const [uploading,     setUploading]     = useState(false);
+  const [savingEdit,    setSavingEdit]    = useState(false);
+  const [savingPago,    setSavingPago]    = useState(false);
+  const [savingNota,    setSavingNota]    = useState(false);
+
+  // ── Loading / not found guards ───────────────────────────────────────────────
 
   if (store.loading) {
     return (
@@ -58,10 +68,12 @@ export default function DetalleExpediente() {
     );
   }
 
-  const e = exp;
+  const e       = exp;
   const paid    = getPaid(e);
   const pct     = getPercent(e);
   const balance = e.quote - paid;
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
 
   function startEdit() {
     setEditClient(e.client); setEditPhone(e.clientPhone); setEditEmail(e.clientEmail);
@@ -72,43 +84,102 @@ export default function DetalleExpediente() {
   }
 
   async function saveEdit() {
-    await store.updateExpediente(e.id, {
-      client: editClient, clientPhone: editPhone, clientEmail: editEmail,
-      court: editCourt, lawyer: editLawyer, counterpart: editCounterpart,
-      description: editDescription, type: editType, status: editStatus,
-      quote: parseFloat(editQuote) || e.quote, paymentMethod: editPaymentMethod,
-    });
-    setEditMode(false);
+    setSavingEdit(true);
+    try {
+      await store.updateExpediente(e.id, {
+        client: editClient, clientPhone: editPhone, clientEmail: editEmail,
+        court: editCourt, lawyer: editLawyer, counterpart: editCounterpart,
+        description: editDescription, type: editType, status: editStatus,
+        quote: parseFloat(editQuote) || e.quote, paymentMethod: editPaymentMethod,
+      });
+      setEditMode(false);
+      toast.success("Expediente actualizado correctamente.");
+    } catch {
+      toast.error("Error al guardar los cambios.");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function handleAddPago() {
     const amount = parseFloat(newPagoAmount);
-    if (!amount || amount <= 0) return;
-    await store.addPago(e.id, amount, newPagoDesc || "Abono");
-    setNewPagoAmount(""); setNewPagoDesc("Abono");
+    if (!amount || amount <= 0) { toast.error("Ingresa un monto válido mayor a 0."); return; }
+    setSavingPago(true);
+    try {
+      await store.addPago(e.id, amount, newPagoDesc || "Abono");
+      setNewPagoAmount(""); setNewPagoDesc("Abono");
+      toast.success(`Pago de $${amount.toLocaleString("es-MX")} registrado.`);
+    } catch {
+      toast.error("Error al registrar el pago.");
+    } finally {
+      setSavingPago(false);
+    }
   }
 
   async function handleAddNota() {
-    if (!newNota.trim()) return;
-    await store.addNota(e.id, newNota.trim());
-    setNewNota("");
+    if (!newNota.trim()) { toast.error("Escribe el texto de la nota."); return; }
+    setSavingNota(true);
+    try {
+      await store.addNota(e.id, newNota.trim());
+      setNewNota("");
+      toast.success("Nota agregada.");
+    } catch {
+      toast.error("Error al agregar la nota.");
+    } finally {
+      setSavingNota(false);
+    }
+  }
+
+  async function handleFileChange(ev: React.ChangeEvent<HTMLInputElement>) {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      await store.addDocumento(e.id, file);
+      toast.success(`Documento "${file.name}" subido exitosamente.`);
+    } catch (err_: unknown) {
+      toast.error((err_ as Error).message ?? "Error al subir el documento.");
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  async function handleDeleteDoc(docId: string, name: string) {
+    try {
+      await store.deleteDocumento(e.id, docId);
+      toast.success(`Documento "${name}" eliminado.`);
+    } catch {
+      toast.error("Error al eliminar el documento.");
+    }
   }
 
   async function handleDeleteExp() {
-    if (window.confirm(`Eliminar el expediente ${e.num}? Esta accion no se puede deshacer.`)) {
-      await store.deleteExpediente(e.id);
-      router.push("/expedientes/lista");
+    if (window.confirm(`¿Eliminar el expediente ${e.num}? Esta acción no se puede deshacer.`)) {
+      try {
+        await store.deleteExpediente(e.id);
+        toast.success("Expediente eliminado.");
+        router.push("/expedientes/lista");
+      } catch {
+        toast.error("Error al eliminar el expediente.");
+      }
     }
   }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex h-full bg-[var(--background)]">
       <ExpedientesSidebar active="Expedientes" />
       <main className="flex flex-col flex-1 gap-6 p-8 overflow-auto">
+
+        {/* Top bar */}
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/expedientes/lista")}
-              className="flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer">
+            <button
+              onClick={() => router.push("/expedientes/lista")}
+              className="flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+            >
               <Icon name="arrow_back" size={20} />
               <span className="font-secondary text-sm">Volver</span>
             </button>
@@ -119,8 +190,14 @@ export default function DetalleExpediente() {
           <div className="flex gap-3">
             {editMode ? (
               <>
-                <Button variant="outline" onClick={() => setEditMode(false)}>Cancelar edicion</Button>
-                <Button icon="save" onClick={saveEdit}>Guardar cambios</Button>
+                <Button variant="outline" onClick={() => setEditMode(false)}>Cancelar edición</Button>
+                <Button
+                  icon="save"
+                  onClick={saveEdit}
+                  className={savingEdit ? "opacity-60 pointer-events-none" : ""}
+                >
+                  {savingEdit ? "Guardando..." : "Guardar cambios"}
+                </Button>
               </>
             ) : (
               <>
@@ -132,33 +209,36 @@ export default function DetalleExpediente() {
         </div>
 
         <div className="flex gap-6">
+          {/* Left column */}
           <div className="flex flex-col gap-6 flex-1 min-w-0">
+
+            {/* General info */}
             <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-6 flex flex-col gap-4">
-              <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Informacion General</h2>
+              <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Información General</h2>
               {editMode ? (
                 <div className="flex flex-col gap-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <InputGroup label="Cliente" value={editClient} onChange={setEditClient} className="w-full" />
-                    <InputGroup label="Juzgado" value={editCourt} onChange={setEditCourt} className="w-full" />
-                    <InputGroup label="Abogado" value={editLawyer} onChange={setEditLawyer} className="w-full" />
-                    <InputGroup label="Telefono" value={editPhone} onChange={setEditPhone} className="w-full" />
-                    <InputGroup label="Email" value={editEmail} onChange={setEditEmail} className="w-full" />
+                    <InputGroup label="Cliente"     value={editClient}      onChange={setEditClient}      className="w-full" />
+                    <InputGroup label="Juzgado"     value={editCourt}       onChange={setEditCourt}       className="w-full" />
+                    <InputGroup label="Abogado"     value={editLawyer}      onChange={setEditLawyer}      className="w-full" />
+                    <InputGroup label="Teléfono"    value={editPhone}       onChange={setEditPhone}       className="w-full" />
+                    <InputGroup label="Email"       value={editEmail}       onChange={setEditEmail}       className="w-full" />
                     <InputGroup label="Contraparte" value={editCounterpart} onChange={setEditCounterpart} className="w-full" />
-                    <SelectGroup label="Tipo" value={editType} options={["Divorcio", "Civil", "Penal", "Laboral", "Mercantil", "Familiar", "Contencioso"]} onChange={setEditType} className="w-full" />
-                    <SelectGroup label="Estado" value={editStatus} options={["Activo", "En Espera", "Inactivo"]} onChange={(v) => setEditStatus(v as "Activo" | "En Espera" | "Inactivo")} className="w-full" />
-                    <InputGroup label="Cotizacion Total ($)" value={editQuote} onChange={setEditQuote} className="w-full" />
-                    <SelectGroup label="Metodo de Pago" value={editPaymentMethod} options={["Transferencia", "Efectivo", "Cheque"]} onChange={setEditPaymentMethod} className="w-full" />
+                    <SelectGroup label="Tipo"   value={editType}   options={["Divorcio","Civil","Penal","Laboral","Mercantil","Familiar","Contencioso"]} onChange={setEditType}   className="w-full" />
+                    <SelectGroup label="Estado" value={editStatus} options={["Activo","En Espera","Inactivo"]} onChange={(v) => setEditStatus(v as "Activo"|"En Espera"|"Inactivo")} className="w-full" />
+                    <InputGroup label="Cotización Total ($)" value={editQuote}         onChange={setEditQuote}         className="w-full" />
+                    <SelectGroup label="Método de Pago"      value={editPaymentMethod} options={["Transferencia","Efectivo","Cheque"]} onChange={setEditPaymentMethod} className="w-full" />
                   </div>
-                  <InputGroup label="Descripcion" value={editDescription} onChange={setEditDescription} className="w-full" />
+                  <InputGroup label="Descripción" value={editDescription} onChange={setEditDescription} className="w-full" />
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   {[
-                    ["Cliente", e.client], ["Juzgado", e.court],
-                    ["Abogado", e.lawyer], ["Tipo", e.type],
-                    ["Telefono", e.clientPhone || "—"], ["Email", e.clientEmail || "—"],
-                    ["Contraparte", e.counterpart || "—"], ["Metodo de Pago", e.paymentMethod],
-                    ["Fecha Inicio", e.createdAt], ["Ultima Actualizacion", e.updatedAt],
+                    ["Cliente", e.client],       ["Juzgado", e.court],
+                    ["Abogado", e.lawyer],        ["Tipo", e.type],
+                    ["Teléfono", e.clientPhone || "—"], ["Email", e.clientEmail || "—"],
+                    ["Contraparte", e.counterpart || "—"], ["Método de Pago", e.paymentMethod],
+                    ["Fecha Inicio", e.createdAt], ["Última Actualización", e.updatedAt],
                   ].map(([label, value]) => (
                     <div key={label} className="flex flex-col gap-1">
                       <span className="font-secondary text-xs text-[var(--muted-foreground)]">{label}</span>
@@ -167,7 +247,7 @@ export default function DetalleExpediente() {
                   ))}
                   {e.description && (
                     <div className="flex flex-col gap-1 col-span-2">
-                      <span className="font-secondary text-xs text-[var(--muted-foreground)]">Descripcion</span>
+                      <span className="font-secondary text-xs text-[var(--muted-foreground)]">Descripción</span>
                       <span className="font-secondary text-sm text-[var(--foreground)]">{e.description}</span>
                     </div>
                   )}
@@ -175,21 +255,53 @@ export default function DetalleExpediente() {
               )}
             </div>
 
+            {/* Documents */}
             <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-6 flex flex-col gap-3">
-              <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Documentos</h2>
-              {e.documentos.length === 0 && (
+              <div className="flex items-center justify-between">
+                <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Documentos</h2>
+                <button
+                  onClick={() => fileInput.current?.click()}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-secondary cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-50"
+                  disabled={uploading}
+                >
+                  <span className="icon-material" style={{ fontSize: 16 }}>{uploading ? "hourglass_empty" : "upload_file"}</span>
+                  {uploading ? "Subiendo..." : "Subir Documento"}
+                </button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="*/*"
+                />
+              </div>
+
+              {e.documentos.length === 0 && !uploading && (
                 <p className="font-secondary text-sm text-[var(--muted-foreground)]">Sin documentos cargados.</p>
               )}
+
               {e.documentos.map((doc) => (
                 <div key={doc.id} className="flex items-center gap-3 py-2 border-b border-[var(--border)]">
                   <Icon name="description" size={20} outlined className="text-[#4285F4]" />
                   <span className="font-secondary text-sm flex-1 text-[var(--foreground)]">{doc.name}</span>
-                  <Label variant="info">{doc.type}</Label>
+                  <Label variant="info">{doc.type || "ARCH"}</Label>
                   <span className="font-primary text-xs text-[var(--muted-foreground)]">{doc.size}</span>
                   <span className="font-primary text-xs text-[var(--muted-foreground)]">{doc.uploadDate}</span>
-                  <button onClick={() => store.deleteDocumento(e.id, doc.id)}
+                  {doc.filePath && (
+                    <a
+                      href={doc.filePath}
+                      download={doc.name}
+                      className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                      title="Descargar documento"
+                    >
+                      <Icon name="download" size={16} />
+                    </a>
+                  )}
+                  <button
+                    onClick={() => handleDeleteDoc(doc.id, doc.name)}
                     className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-colors"
-                    title="Eliminar documento">
+                    title="Eliminar documento"
+                  >
                     <Icon name="delete" size={16} />
                   </button>
                 </div>
@@ -197,7 +309,10 @@ export default function DetalleExpediente() {
             </div>
           </div>
 
+          {/* Right column */}
           <div className="flex flex-col gap-6 w-[380px]">
+
+            {/* Payments */}
             <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-6 flex flex-col gap-4">
               <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Control de Pagos</h2>
               <span className="font-primary text-2xl font-bold text-[var(--foreground)]">${e.quote.toLocaleString("es-MX")}</span>
@@ -210,32 +325,52 @@ export default function DetalleExpediente() {
                 <span className="font-primary text-xs">{pct}%</span>
               </div>
               <div className="flex gap-2 pt-2 border-t border-[var(--border)]">
-                <InputGroup label="Monto ($)" value={newPagoAmount} onChange={setNewPagoAmount} placeholder="0.00" className="flex-1" />
-                <InputGroup label="Concepto" value={newPagoDesc} onChange={setNewPagoDesc} placeholder="Abono" className="flex-1" />
+                <InputGroup label="Monto ($)"  value={newPagoAmount} onChange={setNewPagoAmount} placeholder="0.00"  className="flex-1" />
+                <InputGroup label="Concepto"   value={newPagoDesc}   onChange={setNewPagoDesc}   placeholder="Abono" className="flex-1" />
               </div>
-              <Button icon="add" onClick={handleAddPago} className="w-full">Registrar Pago</Button>
+              <Button
+                icon="add"
+                onClick={handleAddPago}
+                className={`w-full ${savingPago ? "opacity-60 pointer-events-none" : ""}`}
+              >
+                {savingPago ? "Registrando..." : "Registrar Pago"}
+              </Button>
               <div className="flex flex-col gap-1 mt-1">
                 {e.pagos.map((p) => (
                   <div key={p.id} className="flex items-center justify-between py-2 border-b border-[var(--border)] group">
                     <span className="font-secondary text-sm text-[var(--foreground)]">{p.desc}</span>
                     <span className="font-primary text-sm font-semibold text-[#22C55E]">${p.amount.toLocaleString("es-MX")}</span>
                     <span className="font-primary text-xs text-[var(--muted-foreground)]">{p.date}</span>
-                    <button onClick={() => store.deletePago(e.id, p.id)}
-                      className="opacity-0 group-hover:opacity-100 text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-all">
+                    <button
+                      onClick={() => store.deletePago(e.id, p.id)}
+                      className="opacity-0 group-hover:opacity-100 text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-all"
+                    >
                       <Icon name="close" size={14} />
                     </button>
                   </div>
                 ))}
-                {e.pagos.length === 0 && <p className="font-secondary text-xs text-[var(--muted-foreground)]">Sin pagos registrados.</p>}
+                {e.pagos.length === 0 && (
+                  <p className="font-secondary text-xs text-[var(--muted-foreground)]">Sin pagos registrados.</p>
+                )}
               </div>
             </div>
 
+            {/* Notes */}
             <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-6 flex flex-col gap-4">
               <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Notas</h2>
               <div className="flex gap-2">
-                <InputGroup label="" value={newNota} onChange={setNewNota} placeholder="Escribe una nota..." className="flex-1" />
-                <button onClick={handleAddNota}
-                  className="mt-auto mb-0 flex items-center justify-center w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] cursor-pointer hover:opacity-90">
+                <InputGroup
+                  label=""
+                  value={newNota}
+                  onChange={setNewNota}
+                  placeholder="Escribe una nota..."
+                  className="flex-1"
+                />
+                <button
+                  onClick={handleAddNota}
+                  disabled={savingNota}
+                  className="mt-auto mb-0 flex items-center justify-center w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] cursor-pointer hover:opacity-90 disabled:opacity-50"
+                >
                   <Icon name="add" size={20} />
                 </button>
               </div>
@@ -243,13 +378,17 @@ export default function DetalleExpediente() {
                 <div key={n.id} className="flex flex-col gap-1 py-2 border-b border-[var(--border)] group relative">
                   <span className="font-secondary text-sm text-[var(--foreground)]">{n.text}</span>
                   <span className="font-primary text-xs text-[var(--muted-foreground)]">{n.date}</span>
-                  <button onClick={() => store.deleteNota(e.id, n.id)}
-                    className="absolute right-0 top-2 opacity-0 group-hover:opacity-100 text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-all">
+                  <button
+                    onClick={() => store.deleteNota(e.id, n.id)}
+                    className="absolute right-0 top-2 opacity-0 group-hover:opacity-100 text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-all"
+                  >
                     <Icon name="close" size={14} />
                   </button>
                 </div>
               ))}
-              {e.notas.length === 0 && <p className="font-secondary text-xs text-[var(--muted-foreground)]">Sin notas.</p>}
+              {e.notas.length === 0 && (
+                <p className="font-secondary text-xs text-[var(--muted-foreground)]">Sin notas.</p>
+              )}
             </div>
           </div>
         </div>
