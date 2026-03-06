@@ -99,8 +99,8 @@ export default function Prestamos() {
           ))}
         </div>
 
-        <div className="flex flex-col flex-1 bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden">
-          <div className="flex items-center bg-[var(--muted)] px-4 py-3 border-b border-[var(--border)]">
+        <div className="flex flex-col flex-1 min-h-0 bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden">
+          <div className="flex items-center bg-[var(--muted)] px-4 py-3 border-b border-[var(--border)] flex-shrink-0">
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] flex-1">Libro</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[120px]">Codigo</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[150px]">Prestado a</span>
@@ -112,39 +112,41 @@ export default function Prestamos() {
             )}
           </div>
 
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center py-16">
-              <span className="font-secondary text-sm text-[var(--muted-foreground)]">Cargando prestamos...</span>
-            </div>
-          ) : displayed.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center py-16">
-              <span className="font-secondary text-sm text-[var(--muted-foreground)]">
-                {activeTab === "activos" ? "Sin prestamos activos" : "Sin historial de prestamos"}
-              </span>
-            </div>
-          ) : (
-            displayed.map((p) => (
-              <div key={p.id} className="flex items-center px-4 py-3 border-b border-[var(--border)]">
-                <span className="font-secondary text-[13px] text-[var(--foreground)] flex-1">{p.bookTitle}</span>
-                <span className="font-primary text-xs text-[var(--primary)] w-[120px]">{p.bookCode}</span>
-                <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[150px]">{p.person}</span>
-                <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{p.dateOut}</span>
-                <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{p.dateReturn}</span>
-                <div className="w-[100px]">
-                  <Label variant={p.returned ? "secondary" : "warning"}>{p.returned ? "Devuelto" : "Activo"}</Label>
-                </div>
-                {activeTab === "activos" && (
-                  <div className="w-[120px]">
-                    <button onClick={() => handleReturn(p.id)}
-                      className="font-secondary text-xs text-[var(--primary)] hover:underline cursor-pointer">
-                      Marcar devuelto
-                    </button>
-                  </div>
-                )}
+          <div className="overflow-y-auto flex-1">
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <span className="font-secondary text-sm text-[var(--muted-foreground)]">Cargando prestamos...</span>
               </div>
-            ))
-          )}
-          <div className="px-4 py-3">
+            ) : displayed.length === 0 ? (
+              <div className="flex items-center justify-center py-16">
+                <span className="font-secondary text-sm text-[var(--muted-foreground)]">
+                  {activeTab === "activos" ? "Sin prestamos activos" : "Sin historial de prestamos"}
+                </span>
+              </div>
+            ) : (
+              displayed.map((p) => (
+                <div key={p.id} className="flex items-center px-4 py-3 border-b border-[var(--border)]">
+                  <span className="font-secondary text-[13px] text-[var(--foreground)] flex-1">{p.bookTitle}</span>
+                  <span className="font-primary text-xs text-[var(--primary)] w-[120px]">{p.bookCode}</span>
+                  <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[150px]">{p.person}</span>
+                  <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{p.dateOut}</span>
+                  <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{p.dateReturn}</span>
+                  <div className="w-[100px]">
+                    <Label variant={p.returned ? "secondary" : "warning"}>{p.returned ? "Devuelto" : "Activo"}</Label>
+                  </div>
+                  {activeTab === "activos" && (
+                    <div className="w-[120px]">
+                      <button onClick={() => handleReturn(p.id)}
+                        className="font-secondary text-xs text-[var(--primary)] hover:underline cursor-pointer">
+                        Marcar devuelto
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="px-4 py-3 border-t border-[var(--border)] flex-shrink-0">
             <span className="font-secondary text-xs text-[var(--muted-foreground)]">
               {displayed.length} prestamo{displayed.length !== 1 ? "s" : ""} {activeTab === "activos" ? "activos" : "en historial"}
             </span>

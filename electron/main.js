@@ -7,7 +7,10 @@
  *  - Producción: fork del servidor standalone de Next.js en un puerto libre
  */
 
-const { app, BrowserWindow, shell, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, shell, dialog, ipcMain, Menu } = require("electron");
+
+// Eliminar el menú nativo de Electron para una apariencia profesional
+Menu.setApplicationMenu(null);
 const path   = require("path");
 const fs     = require("fs");
 const http   = require("http");
