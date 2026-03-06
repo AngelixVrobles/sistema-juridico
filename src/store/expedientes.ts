@@ -21,7 +21,68 @@ export interface Documento {
   name: string;
   type: string;
   size: string;
+  filePath: string;
   uploadDate: string;
+}
+
+// ─── Hook de clientes ────────────────────────────────────────────────────────────
+
+export interface Cliente {
+  id:        string;
+  nombre:    string;
+  telefono:  string;
+  email:     string;
+  direccion: string;
+  notas:     string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function useClientesStore() {
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading,  setLoading]  = useState(true);
+
+  const fetchClientes = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/clientes");
+    if (res.ok) setClientes(await res.json());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchClientes(); }, [fetchClientes]);
+
+  async function addCliente(data: Omit<Cliente, "id" | "createdAt" | "updatedAt">) {
+    const res = await fetch("/api/clientes", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error ?? "Error al crear cliente");
+    }
+    await fetchClientes();
+  }
+
+  async function updateCliente(id: string, data: Partial<Omit<Cliente, "id" | "createdAt" | "updatedAt">>) {
+    const res = await fetch(`/api/clientes/${id}`, {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error ?? "Error al actualizar cliente");
+    }
+    await fetchClientes();
+  }
+
+  async function deleteCliente(id: string) {
+    await fetch(`/api/clientes/${id}`, { method: "DELETE" });
+    await fetchClientes();
+  }
+
+  return { clientes, loading, addCliente, updateCliente, deleteCliente, refresh: fetchClientes };
 }
 
 export interface Expediente {
@@ -203,12 +264,17 @@ export function useExpedientesStore() {
 
   // ── Documentos ──────────────────────────────────────────────────────────────
 
-  async function addDocumento(expedienteId: string, doc: Omit<Documento, "id">) {
-    await fetch(`/api/expedientes/${expedienteId}/documentos`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ name: doc.name, type: doc.type, size: doc.size }),
+  async function addDocumento(expedienteId: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`/api/expedientes/${expedienteId}/documentos`, {
+      method: "POST",
+      body:   formData,
     });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error ?? "Error al subir documento");
+    }
     await fetchExpedientes();
   }
 

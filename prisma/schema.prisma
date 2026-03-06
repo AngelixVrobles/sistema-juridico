@@ -64,6 +64,17 @@ model Prestamo {
 
 // ─── EXPEDIENTES ───────────────────────────────────────────────────────────────
 
+model Cliente {
+  id          String   @id @default(cuid())
+  nombre      String
+  telefono    String   @default("")
+  email       String   @default("")
+  direccion   String   @default("")
+  notas       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Juzgado {
   id           String   @id @default(cuid())
   nombre       String   @unique
@@ -121,6 +132,7 @@ model Documento {
   nombre       String
   tipo         String     @default("")
   tamanio      String     @default("")
+  rutaArchivo  String     @default("")
   fecha        DateTime   @default(now())
   createdAt    DateTime   @default(now())
 }

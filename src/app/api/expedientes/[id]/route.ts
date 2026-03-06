@@ -15,7 +15,7 @@ function toExpediente(e: {
   metodoPago: string; createdAt: Date; updatedAt: Date;
   pagos:      { id: string; descripcion: string; monto: number; fecha: Date }[];
   notas:      { id: string; texto: string; fecha: Date }[];
-  documentos: { id: string; nombre: string; tipo: string; tamanio: string; fecha: Date }[];
+  documentos: { id: string; nombre: string; tipo: string; tamanio: string; rutaArchivo: string; fecha: Date }[];
 }) {
   return {
     id:            e.id,
@@ -35,7 +35,7 @@ function toExpediente(e: {
     updatedAt:     fmt(e.updatedAt),
     pagos:      e.pagos.map((p) => ({ id: p.id, desc: p.descripcion, amount: p.monto, date: fmt(p.fecha) })),
     notas:      e.notas.map((n) => ({ id: n.id, text: n.texto, date: fmt(n.fecha) })),
-    documentos: e.documentos.map((d) => ({ id: d.id, name: d.nombre, type: d.tipo, size: d.tamanio, uploadDate: fmt(d.fecha) })),
+    documentos: e.documentos.map((d) => ({ id: d.id, name: d.nombre, type: d.tipo, size: d.tamanio, filePath: d.rutaArchivo, uploadDate: fmt(d.fecha) })),
   };
 }
 
