@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── BIBLIOTECA ────────────────────────────────────────────────────────────────
+
+model Seccion {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  prefijo     String   @unique
+  descripcion String   @default("")
+  icono       String   @default("menu_book")
+  vigas       Viga[]
+  libros      Libro[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Viga {
+  id        String   @id @default(cuid())
+  numero    String
+  capacidad Int      @default(20)
+  seccionId String
+  seccion   Seccion  @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  libros    Libro[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([seccionId, numero])
+}
+
+model Libro {
+  id        String     @id @default(cuid())
+  codigo    String     @unique
+  titulo    String
+  autor     String
+  seccionId String
+  seccion   Seccion    @relation(fields: [seccionId], references: [id])
+  vigaId    String?
+  viga      Viga?      @relation(fields: [vigaId], references: [id])
+  posicion  String     @default("")
+  estado    String     @default("Disponible")
+  prestamos Prestamo[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Prestamo {
+  id              String    @id @default(cuid())
+  libroId         String
+  libro           Libro     @relation(fields: [libroId], references: [id])
+  persona         String
+  fechaSalida     DateTime  @default(now())
+  fechaDevolucion DateTime?
+  devuelto        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ─── EXPEDIENTES ───────────────────────────────────────────────────────────────
+
+model Juzgado {
+  id           String   @id @default(cuid())
+  nombre       String   @unique
+  jurisdiccion String   @default("")
+  direccion    String   @default("")
+  telefono     String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Expediente {
+  id              String      @id @default(cuid())
+  numero          String      @unique
+  cliente         String
+  clienteTelefono String      @default("")
+  clienteEmail    String      @default("")
+  juzgado         String      @default("")
+  abogado         String      @default("")
+  contraparte     String      @default("")
+  descripcion     String      @default("")
+  tipo            String
+  estado          String      @default("Activo")
+  cotizacion      Float       @default(0)
+  metodoPago      String      @default("")
+  pagos           Pago[]
+  notas           Nota[]
+  documentos      Documento[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Pago {
+  id           String     @id @default(cuid())
+  expedienteId String
+  expediente   Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  descripcion  String     @default("Abono")
+  monto        Float
+  fecha        DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+}
+
+model Nota {
+  id           String     @id @default(cuid())
+  expedienteId String
+  expediente   Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  texto        String
+  fecha        DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+}
+
+model Documento {
+  id           String     @id @default(cuid())
+  expedienteId String
+  expediente   Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  nombre       String
+  tipo         String     @default("")
+  tamanio      String     @default("")
+  fecha        DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+}

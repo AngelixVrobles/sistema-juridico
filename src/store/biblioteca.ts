@@ -1,17 +1,7 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+"use client";
+import { useState, useEffect, useCallback } from "react";
 
-function genId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
-
-function today(): string {
-  return new Date().toLocaleDateString("es-MX", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+// ─── Tipos ─────────────────────────────────────────────────────────────────────
 
 export interface Libro {
   id: string;
@@ -19,7 +9,9 @@ export interface Libro {
   title: string;
   author: string;
   section: string;
+  sectionId: string;
   viga: string;
+  vigaId: string | null;
   position: string;
   status: "Disponible" | "Prestado";
   createdAt: string;
@@ -36,111 +28,177 @@ export interface Prestamo {
   returned: boolean;
 }
 
-const seedLibros: Libro[] = [
-  { id: "lib1", code: "CIV-V01-003", title: "Codigo Civil Comentado", author: "Eduardo Garcia", section: "Civil", viga: "V01", position: "003", status: "Disponible", createdAt: "1/ene./2026" },
-  { id: "lib2", code: "PEN-V02-001", title: "Derecho Penal Mexicano", author: "Raul Carranca", section: "Penal", viga: "V02", position: "001", status: "Prestado", createdAt: "1/ene./2026" },
-  { id: "lib3", code: "LAB-V01-005", title: "Ley Federal del Trabajo", author: "Alberto Trueba", section: "Laboral", viga: "V01", position: "005", status: "Disponible", createdAt: "15/ene./2026" },
-  { id: "lib4", code: "MER-V01-002", title: "Derecho Mercantil", author: "Roberto Mantilla", section: "Mercantil", viga: "V01", position: "002", status: "Disponible", createdAt: "20/ene./2026" },
-  { id: "lib5", code: "CON-V01-002", title: "Constitucion Politica de los Estados Unidos Mexicanos", author: "Gobierno Federal", section: "Constitucional", viga: "V01", position: "002", status: "Disponible", createdAt: "1/ene./2026" },
-];
-
-const seedPrestamos: Prestamo[] = [
-  { id: "pr1", bookId: "lib2", bookCode: "PEN-V02-001", bookTitle: "Derecho Penal Mexicano", person: "Juan Perez", dateOut: "15/ene./2026", dateReturn: "15/feb./2026", returned: false },
-  { id: "pr2", bookId: "lib3", bookCode: "LAB-V01-005", bookTitle: "Ley Federal del Trabajo", person: "Maria Garcia", dateOut: "20/ene./2026", dateReturn: "20/feb./2026", returned: true },
-  { id: "pr3", bookId: "lib4", bookCode: "MER-V01-002", bookTitle: "Derecho Mercantil", person: "Carlos Lopez", dateOut: "1/feb./2026", dateReturn: "1/mar./2026", returned: true },
-];
-
-const SECTION_PREFIX: Record<string, string> = {
-  Civil: "CIV", Penal: "PEN", Laboral: "LAB", Mercantil: "MER",
-  Constitucional: "CON", Otros: "OTR",
-};
-
-interface BibliotecaState {
-  libros: Libro[];
-  prestamos: Prestamo[];
-  nextCode: Record<string, number>;
-  addLibro: (data: Omit<Libro, "id" | "code" | "status" | "createdAt">) => void;
-  updateLibro: (id: string, data: Partial<Omit<Libro, "id" | "code" | "createdAt">>) => void;
-  deleteLibro: (id: string) => void;
-  addPrestamo: (bookId: string, person: string, dateReturn: string) => void;
-  returnPrestamo: (prestamoId: string) => void;
+export interface Seccion {
+  id: string;
+  nombre: string;
+  prefijo: string;
+  descripcion: string;
+  icono: string;
+  bookCount: number;
+  vigaCount: number;
 }
 
-export const useBibliotecaStore = create<BibliotecaState>()(
-  persist(
-    (set, get) => ({
-      libros: seedLibros,
-      prestamos: seedPrestamos,
-      nextCode: { Civil: 10, Penal: 5, Laboral: 8, Mercantil: 4, Constitucional: 4, Otros: 1 },
+export interface Viga {
+  id: string;
+  numero: string;
+  capacidad: number;
+  seccionId: string;
+  seccionNombre: string;
+  seccionPrefijo: string;
+  libroCount: number;
+}
 
-      addLibro: (data) => {
-        set((state) => {
-          const prefix = SECTION_PREFIX[data.section] || "LIB";
-          const n = state.nextCode[data.section] || 1;
-          const code = `${prefix}-${data.viga}-${String(n).padStart(3, "0")}`;
-          const newLibro: Libro = {
-            id: genId(), code,
-            title: data.title, author: data.author, section: data.section,
-            viga: data.viga, position: data.position || String(n).padStart(3, "0"),
-            status: "Disponible", createdAt: today(),
-          };
-          return {
-            libros: [...state.libros, newLibro],
-            nextCode: { ...state.nextCode, [data.section]: n + 1 },
-          };
-        });
-      },
+// ─── Hook principal ─────────────────────────────────────────────────────────────
 
-      updateLibro: (id, data) => {
-        set((state) => ({
-          libros: state.libros.map((l) => (l.id === id ? { ...l, ...data } : l)),
-        }));
-      },
+export function useBibliotecaStore() {
+  const [libros,    setLibros]    = useState<Libro[]>([]);
+  const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
+  const [secciones, setSecciones] = useState<Seccion[]>([]);
+  const [vigas,     setVigas]     = useState<Viga[]>([]);
+  const [loading,   setLoading]   = useState(true);
 
-      deleteLibro: (id) => {
-        set((state) => ({ libros: state.libros.filter((l) => l.id !== id) }));
-      },
+  // ── Fetch ───────────────────────────────────────────────────────────────────
 
-      addPrestamo: (bookId, person, dateReturn) => {
-        const libro = get().libros.find((l) => l.id === bookId);
-        if (!libro || libro.status === "Prestado") return;
-        set((state) => ({
-          libros: state.libros.map((l) =>
-            l.id === bookId ? { ...l, status: "Prestado" as const } : l
-          ),
-          prestamos: [
-            ...state.prestamos,
-            {
-              id: genId(), bookId, bookCode: libro.code, bookTitle: libro.title,
-              person, dateOut: today(), dateReturn, returned: false,
-            },
-          ],
-        }));
-      },
+  const fetchLibros = useCallback(async () => {
+    const res = await fetch("/api/biblioteca/libros");
+    if (res.ok) setLibros(await res.json());
+  }, []);
 
-      returnPrestamo: (prestamoId) => {
-        set((state) => {
-          const prestamo = state.prestamos.find((p) => p.id === prestamoId);
-          if (!prestamo) return state;
-          return {
-            prestamos: state.prestamos.map((p) =>
-              p.id === prestamoId ? { ...p, returned: true } : p
-            ),
-            libros: state.libros.map((l) =>
-              l.id === prestamo.bookId ? { ...l, status: "Disponible" as const } : l
-            ),
-          };
-        });
-      },
-    }),
-    {
-      name: "biblioteca-storage",
-      storage: createJSONStorage(() => {
-        if (typeof window === "undefined") {
-          return { getItem: () => null, setItem: () => {}, removeItem: () => {} };
-        }
-        return localStorage;
-      }),
+  const fetchPrestamos = useCallback(async () => {
+    const res = await fetch("/api/biblioteca/prestamos");
+    if (res.ok) setPrestamos(await res.json());
+  }, []);
+
+  const fetchSecciones = useCallback(async () => {
+    const res = await fetch("/api/biblioteca/secciones");
+    if (res.ok) setSecciones(await res.json());
+  }, []);
+
+  const fetchVigas = useCallback(async () => {
+    const res = await fetch("/api/biblioteca/vigas");
+    if (res.ok) setVigas(await res.json());
+  }, []);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([fetchLibros(), fetchPrestamos(), fetchSecciones(), fetchVigas()]);
+    setLoading(false);
+  }, [fetchLibros, fetchPrestamos, fetchSecciones, fetchVigas]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── Libros ──────────────────────────────────────────────────────────────────
+
+  async function addLibro(data: { title: string; author: string; section: string; viga: string; position: string }) {
+    await fetch("/api/biblioteca/libros", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+    await Promise.all([fetchLibros(), fetchSecciones(), fetchVigas()]);
+  }
+
+  async function updateLibro(id: string, data: Partial<Pick<Libro, "title" | "author" | "section" | "viga" | "position" | "status">>) {
+    await fetch(`/api/biblioteca/libros/${id}`, {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+    await fetchLibros();
+  }
+
+  async function deleteLibro(id: string) {
+    const res = await fetch(`/api/biblioteca/libros/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error ?? "Error al eliminar");
     }
-  )
-);
+    await Promise.all([fetchLibros(), fetchSecciones()]);
+  }
+
+  // ── Préstamos ───────────────────────────────────────────────────────────────
+
+  async function addPrestamo(bookId: string, person: string, dateReturn: string) {
+    await fetch("/api/biblioteca/prestamos", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ bookId, person, dateReturn }),
+    });
+    await fetchAll();
+  }
+
+  async function returnPrestamo(prestamoId: string) {
+    await fetch(`/api/biblioteca/prestamos/${prestamoId}`, {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ returned: true }),
+    });
+    await fetchAll();
+  }
+
+  // ── Secciones ───────────────────────────────────────────────────────────────
+
+  async function addSeccion(data: { nombre: string; prefijo: string; descripcion: string; icono: string }) {
+    const res = await fetch("/api/biblioteca/secciones", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error ?? "Error al crear sección");
+    }
+    await Promise.all([fetchSecciones(), fetchVigas()]);
+  }
+
+  async function updateSeccion(id: string, data: Partial<Pick<Seccion, "nombre" | "prefijo" | "descripcion" | "icono">>) {
+    await fetch(`/api/biblioteca/secciones/${id}`, {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+    await fetchSecciones();
+  }
+
+  async function deleteSeccion(id: string) {
+    const res = await fetch(`/api/biblioteca/secciones/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error ?? "Error al eliminar sección");
+    }
+    await Promise.all([fetchSecciones(), fetchVigas()]);
+  }
+
+  // ── Vigas ───────────────────────────────────────────────────────────────────
+
+  async function addViga(data: { numero: string; capacidad: number; seccionId: string }) {
+    const res = await fetch("/api/biblioteca/vigas", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error ?? "Error al crear viga");
+    }
+    await Promise.all([fetchVigas(), fetchSecciones()]);
+  }
+
+  async function deleteViga(id: string) {
+    const res = await fetch(`/api/biblioteca/vigas/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error ?? "Error al eliminar viga");
+    }
+    await Promise.all([fetchVigas(), fetchSecciones()]);
+  }
+
+  return {
+    libros, prestamos, secciones, vigas, loading,
+    addLibro, updateLibro, deleteLibro,
+    addPrestamo, returnPrestamo,
+    addSeccion, updateSeccion, deleteSeccion,
+    addViga, deleteViga,
+    refresh: fetchAll,
+  };
+}
