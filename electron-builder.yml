@@ -1,0 +1,76 @@
+# electron-builder.yml — Configuración de empaquetado para Windows
+# Uso: npm run electron:build:win
+
+appId:   "mx.com.sistemajuridico.app"
+productName: "Sistema Jurídico"
+copyright: "© 2025 Sistema Jurídico"
+
+# ─── Directorios ─────────────────────────────────────────────────────────────
+directories:
+  output: dist-electron
+  buildResources: electron/resources
+
+# ─── Archivos a incluir en el paquete ────────────────────────────────────────
+files:
+  # Proceso principal de Electron
+  - electron/main.js
+  - electron/preload.js
+  # Build de Next.js standalone (generado por npm run build + prepare-electron)
+  - .next/standalone/**
+  # node_modules mínimos que necesita el main process (electron mismo los carga)
+  - "!node_modules/**"
+  - "!src/**"
+  - "!prisma/migrations/**"
+  - "!scripts/**"
+  - "!*.ts"
+  - "!*.md"
+
+# ─── Recursos extra (copiados a resources/) ───────────────────────────────────
+extraResources:
+  # La app standalone se convierte en el "app"
+  - from: ".next/standalone"
+    to: "app"
+    filter:
+      - "**/*"
+  # DB semilla para primera ejecución
+  - from: "prisma/biblioteca.db"
+    to: "app/prisma/biblioteca.db"
+  # Archivos estáticos y públicos
+  - from: ".next/standalone/.next/static"
+    to: "app/.next/static"
+  - from: ".next/standalone/public"
+    to: "app/public"
+
+# ─── Icono de la aplicación ───────────────────────────────────────────────────
+# Coloca tu icono en electron/resources/icon.ico (256x256 mínimo)
+# win:
+#   icon: electron/resources/icon.ico
+
+# ─── Windows ─────────────────────────────────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+# ─── Instalador NSIS ─────────────────────────────────────────────────────────
+nsis:
+  oneClick:          false
+  allowToChangeInstallationDirectory: true
+  installerLanguages: ["SpanishMX"]
+  language: "3082"   # 3082 = Spanish (Mexico) en LCID
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Sistema Jurídico"
+  uninstallDisplayName: "Sistema Jurídico — Desinstalar"
+
+# ─── Portable ────────────────────────────────────────────────────────────────
+portable:
+  artifactName: "SistemaJuridico-portable-${version}.exe"
+
+# ─── Autoactualización (opcional, requiere servidor de actualizaciones) ────────
+# publish:
+#   provider: github
+#   owner: tu-usuario
+#   repo: sistema-juridico
