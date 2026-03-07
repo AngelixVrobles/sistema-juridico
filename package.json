@@ -17,6 +17,7 @@
     "electron:dev": "concurrently --kill-others \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "cross-env BUILD_TARGET=electron next build && node scripts/prepare-electron.js",
     "electron:build:win": "npm run electron:build && electron-builder --win",
+    "electron:build:mac": "npm run electron:build && electron-builder --mac",
     "electron:preview": "cross-env NODE_ENV=production electron ."
   },
   "prisma": {
@@ -39,6 +40,7 @@
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "electron": "^40.8.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

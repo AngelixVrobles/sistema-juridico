@@ -1,0 +1,54 @@
+directories:
+  output: dist-electron
+  buildResources: electron/resources
+appId: mx.com.sistemajuridico.app
+productName: Sistema Jurídico
+copyright: © 2025 Sistema Jurídico
+files:
+  - filter:
+      - electron/main.js
+      - electron/preload.js
+      - .next/standalone/**
+      - '!node_modules/**'
+      - '!src/**'
+      - '!prisma/migrations/**'
+      - '!scripts/**'
+      - '!*.ts'
+      - '!*.md'
+extraResources:
+  - from: .next/standalone
+    to: app
+    filter:
+      - '**/*'
+  - from: prisma/biblioteca.db
+    to: app/prisma/biblioteca.db
+  - from: .next/standalone/.next/static
+    to: app/.next/static
+  - from: .next/standalone/public
+    to: app/public
+win:
+  icon: electron/resources/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+mac:
+  icon: electron/resources/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sistema Jurídico
+  uninstallDisplayName: Sistema Jurídico — Desinstalar
+portable:
+  artifactName: SistemaJuridico-portable-${version}.exe
+electronVersion: 40.8.0

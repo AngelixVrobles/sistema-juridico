@@ -67,10 +67,8 @@ mac:
 
 # ─── Instalador NSIS ─────────────────────────────────────────────────────────
 nsis:
-  oneClick:          false
+  oneClick: false
   allowToChangeInstallationDirectory: true
-  installerLanguages: ["SpanishMX"]
-  language: "3082"   # 3082 = Spanish (Mexico) en LCID
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: "Sistema Jurídico"
