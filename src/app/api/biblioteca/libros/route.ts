@@ -6,7 +6,7 @@ function toLibro(l: {
   id: string; codigo: string; titulo: string; autor: string;
   seccion: { id: string; nombre: string };
   viga: { id: string; numero: string } | null;
-  posicion: string; estado: string; createdAt: Date;
+  posicion: string; estado: string; portada: string; createdAt: Date;
 }) {
   return {
     id:        l.id,
@@ -19,6 +19,7 @@ function toLibro(l: {
     vigaId:    l.viga?.id ?? null,
     position:  l.posicion,
     status:    l.estado as "Disponible" | "Prestado",
+    portada:   l.portada,
     createdAt: fmt(l.createdAt),
   };
 }

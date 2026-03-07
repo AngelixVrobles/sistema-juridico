@@ -4,6 +4,7 @@ import { BibliotecaSidebar } from "@/components/BibliotecaSidebar";
 import { Button }            from "@/components/Button";
 import { useBibliotecaStore } from "@/store/biblioteca";
 import { useToast }          from "@/context/ToastContext";
+import { useSettingsStore }  from "@/store/settings";
 
 const REPORTS = [
   { id: "inventario", icon: "menu_book",     color: "#3B82F6", title: "Inventario General",     desc: "Listado completo de libros por sección, viga y estado de disponibilidad." },
@@ -90,6 +91,7 @@ function BibliotecaReportModal({ reportId, libros, prestamos, secciones, vigas, 
   secciones: Seccion[]; vigas: Viga[]; onClose: () => void;
 }) {
   const report = REPORTS.find((r) => r.id === reportId)!;
+  const { officeName } = useSettingsStore();
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-auto p-8">
       <div className="bg-[var(--background)] border border-[var(--border)] shadow-2xl w-full max-w-5xl flex flex-col">
@@ -98,7 +100,10 @@ function BibliotecaReportModal({ reportId, libros, prestamos, secciones, vigas, 
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${report.color}20` }}>
               <span className="icon-material-outlined" style={{ fontSize: 18, color: report.color }}>{report.icon}</span>
             </div>
-            <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">{report.title}</h2>
+            <div className="flex flex-col gap-0.5">
+              <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">{report.title}</h2>
+              <span className="font-secondary text-xs text-[var(--muted-foreground)]">{officeName}</span>
+            </div>
           </div>
           <div className="flex gap-3">
             <Button icon="print" onClick={() => window.print()}>Imprimir</Button>

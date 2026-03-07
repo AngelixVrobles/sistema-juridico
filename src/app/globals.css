@@ -37,6 +37,44 @@
   --black: #000000;
 }
 
+/* ── Modo oscuro ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --background:                #1C1C1E;
+  --foreground:                #F0F0F0;
+  --card:                      #2C2C2E;
+  --card-foreground:           #F0F0F0;
+  --primary:                   #FF8400;
+  --primary-foreground:        #111111;
+  --secondary:                 #3A3A3C;
+  --secondary-foreground:      #F0F0F0;
+  --muted:                     #1C1C1E;
+  --muted-foreground:          #8E8E93;
+  --accent:                    #2C2C2E;
+  --accent-foreground:         #F0F0F0;
+  --destructive:               #FF453A;
+  --border:                    #3A3A3C;
+  --input:                     #3A3A3C;
+  --ring:                      #636366;
+  --sidebar:                   #161618;
+  --sidebar-foreground:        #8E8E93;
+  --sidebar-accent:            #2C2C2E;
+  --sidebar-accent-foreground: #F0F0F0;
+  --sidebar-border:            #2C2C2E;
+  --sidebar-primary:           #F0F0F0;
+  --sidebar-primary-foreground:#1C1C1E;
+  --sidebar-ring:              #636366;
+  --color-success:             #1A2E1F;
+  --color-success-foreground:  #34D399;
+  --color-warning:             #2E1F0A;
+  --color-warning-foreground:  #FBBF24;
+  --color-error:               #2E1010;
+  --color-error-foreground:    #F87171;
+  --color-info:                #0A1020;
+  --color-info-foreground:     #818CF8;
+  --white:                     #FFFFFF;
+  --black:                     #000000;
+}
+
 @layer base {
   html, body {
     height: 100%;

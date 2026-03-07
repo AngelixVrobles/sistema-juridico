@@ -1,7 +1,9 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { create }            from "zustand";
+import { useEffect }         from "react";
+import { useSettingsStore }  from "./settings";
 
-// ─── Tipos ─────────────────────────────────────────────────────────────────────
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export interface Libro {
   id: string;
@@ -14,6 +16,7 @@ export interface Libro {
   vigaId: string | null;
   position: string;
   status: "Disponible" | "Prestado";
+  portada: string;
   createdAt: string;
 }
 
@@ -48,157 +51,279 @@ export interface Viga {
   libroCount: number;
 }
 
-// ─── Hook principal ─────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const CACHE_TTL = 30_000; // 30 segundos
+
+function api(path: string): string {
+  const { serverUrl } = useSettingsStore.getState();
+  const base = serverUrl ? serverUrl.replace(/\/$/, "") : "";
+  return `${base}${path}`;
+}
+
+async function getJson<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(api(path));
+    if (res.ok) return res.json();
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(api(path), {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as Record<string,string>).error ?? "Error en la petición");
+  }
+  return res.json();
+}
+
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(api(path), {
+    method:  "PUT",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Error al actualizar");
+  return res.json();
+}
+
+async function del(path: string): Promise<void> {
+  const res = await fetch(api(path), { method: "DELETE" });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as Record<string,string>).error ?? "Error al eliminar");
+  }
+}
+
+// ─── Estado del store ────────────────────────────────────────────────────────
+
+interface BibliotecaState {
+  libros:      Libro[];
+  prestamos:   Prestamo[];
+  secciones:   Seccion[];
+  vigas:       Viga[];
+  loading:     boolean;
+  lastFetched: number;
+
+  // Acciones internas
+  _init:    () => Promise<void>;
+  refresh:  () => Promise<void>;
+  _refetchMeta: () => Promise<void>;
+
+  // Libros
+  addLibro:      (data: { title: string; author: string; section: string; viga: string; position: string }, imageFile?: File | null) => Promise<void>;
+  updateLibro:   (id: string, data: Partial<Pick<Libro, "title" | "author" | "section" | "viga" | "position" | "status">>) => Promise<void>;
+  deleteLibro:   (id: string) => Promise<void>;
+  uploadPortada: (id: string, imageFile: File) => Promise<void>;
+
+  // Préstamos
+  addPrestamo:    (bookId: string, person: string, dateReturn: string) => Promise<void>;
+  returnPrestamo: (prestamoId: string) => Promise<void>;
+
+  // Secciones
+  addSeccion:    (data: { nombre: string; prefijo: string; descripcion: string; icono: string }) => Promise<void>;
+  updateSeccion: (id: string, data: Partial<Pick<Seccion, "nombre" | "prefijo" | "descripcion" | "icono">>) => Promise<void>;
+  deleteSeccion: (id: string) => Promise<void>;
+
+  // Vigas
+  addViga:    (data: { numero: string; capacidad: number; seccionId: string }) => Promise<void>;
+  deleteViga: (id: string) => Promise<void>;
+}
+
+// ─── Timer de polling (módulo, no estado) ────────────────────────────────────
+
+let _pollTimer: ReturnType<typeof setInterval> | null = null;
+
+// ─── Zustand store singleton ──────────────────────────────────────────────────
+
+const _store = create<BibliotecaState>()((set, get) => ({
+  libros:      [],
+  prestamos:   [],
+  secciones:   [],
+  vigas:       [],
+  loading:     false,
+  lastFetched: 0,
+
+  // ── Init (con caché) ──────────────────────────────────────────────────────
+
+  _init: async () => {
+    if (Date.now() - get().lastFetched < CACHE_TTL) return;
+    await get().refresh();
+
+    // Iniciar polling una sola vez
+    if (typeof window !== "undefined" && !_pollTimer) {
+      const ms = (useSettingsStore.getState().pollInterval || 30) * 1000;
+      _pollTimer = setInterval(() => {
+        _store.getState().refresh();
+      }, ms);
+    }
+  },
+
+  // ── Fetch completo ────────────────────────────────────────────────────────
+
+  refresh: async () => {
+    set({ loading: true });
+    try {
+      const [libros, prestamos, secciones, vigas] = await Promise.all([
+        getJson<Libro[]>("/api/biblioteca/libros"),
+        getJson<Prestamo[]>("/api/biblioteca/prestamos"),
+        getJson<Seccion[]>("/api/biblioteca/secciones"),
+        getJson<Viga[]>("/api/biblioteca/vigas"),
+      ]);
+      set({
+        libros:      libros      ?? get().libros,
+        prestamos:   prestamos   ?? get().prestamos,
+        secciones:   secciones   ?? get().secciones,
+        vigas:       vigas       ?? get().vigas,
+        loading:     false,
+        lastFetched: Date.now(),
+      });
+    } catch {
+      set({ loading: false });
+    }
+  },
+
+  // Refrescar solo secciones y vigas (conteos cambian al añadir/borrar libros)
+  _refetchMeta: async () => {
+    const [secciones, vigas] = await Promise.all([
+      getJson<Seccion[]>("/api/biblioteca/secciones"),
+      getJson<Viga[]>("/api/biblioteca/vigas"),
+    ]);
+    set({ secciones: secciones ?? get().secciones, vigas: vigas ?? get().vigas });
+  },
+
+  // ── Libros ───────────────────────────────────────────────────────────────
+
+  addLibro: async (data, imageFile) => {
+    const libro = await postJson<Libro>("/api/biblioteca/libros", data);
+
+    // Upload de portada si se proporcionó
+    if (imageFile) {
+      try {
+        const formData = new FormData();
+        formData.append("portada", imageFile);
+        const res = await fetch(api(`/api/biblioteca/libros/${libro.id}/portada`), {
+          method: "POST",
+          body:   formData,
+        });
+        if (res.ok) {
+          const { portada } = await res.json();
+          libro.portada = portada;
+        }
+      } catch { /* no bloquear si falla el upload */ }
+    }
+
+    set((s) => ({ libros: [libro, ...s.libros] }));
+    get()._refetchMeta(); // actualizar conteos en background
+  },
+
+  uploadPortada: async (id, imageFile) => {
+    const formData = new FormData();
+    formData.append("portada", imageFile);
+    const res = await fetch(api(`/api/biblioteca/libros/${id}/portada`), {
+      method: "POST",
+      body:   formData,
+    });
+    if (!res.ok) throw new Error("Error al subir la portada");
+    const { portada } = await res.json();
+    set((s) => ({
+      libros: s.libros.map((b) => b.id === id ? { ...b, portada } : b),
+    }));
+  },
+
+  updateLibro: async (id, data) => {
+    await putJson(`/api/biblioteca/libros/${id}`, data);
+    set((s) => ({
+      libros: s.libros.map((b) => (b.id === id ? { ...b, ...data } : b)),
+    }));
+  },
+
+  deleteLibro: async (id) => {
+    await del(`/api/biblioteca/libros/${id}`);
+    set((s) => ({ libros: s.libros.filter((b) => b.id !== id) }));
+    get()._refetchMeta();
+  },
+
+  // ── Préstamos ─────────────────────────────────────────────────────────────
+
+  addPrestamo: async (bookId, person, dateReturn) => {
+    const prestamo = await postJson<Prestamo>("/api/biblioteca/prestamos", { bookId, person, dateReturn });
+    set((s) => ({
+      prestamos: [prestamo, ...s.prestamos],
+      libros:    s.libros.map((b) => b.id === bookId ? { ...b, status: "Prestado" as const } : b),
+    }));
+  },
+
+  returnPrestamo: async (prestamoId) => {
+    const updated = await putJson<Prestamo>(`/api/biblioteca/prestamos/${prestamoId}`, { returned: true });
+    set((s) => ({
+      prestamos: s.prestamos.map((p) => p.id === prestamoId ? { ...p, returned: true } : p),
+      libros:    s.libros.map((b) => b.id === updated.bookId ? { ...b, status: "Disponible" as const } : b),
+    }));
+  },
+
+  // ── Secciones ─────────────────────────────────────────────────────────────
+
+  addSeccion: async (data) => {
+    const seccion = await postJson<Seccion>("/api/biblioteca/secciones", data);
+    set((s) => ({ secciones: [...s.secciones, seccion] }));
+  },
+
+  updateSeccion: async (id, data) => {
+    await putJson(`/api/biblioteca/secciones/${id}`, data);
+    set((s) => ({
+      secciones: s.secciones.map((sec) => sec.id === id ? { ...sec, ...data } : sec),
+    }));
+  },
+
+  deleteSeccion: async (id) => {
+    await del(`/api/biblioteca/secciones/${id}`);
+    set((s) => ({
+      secciones: s.secciones.filter((sec) => sec.id !== id),
+      vigas:     s.vigas.filter((v) => v.seccionId !== id),
+    }));
+  },
+
+  // ── Vigas ─────────────────────────────────────────────────────────────────
+
+  addViga: async (data) => {
+    const viga = await postJson<Viga>("/api/biblioteca/vigas", data);
+    set((s) => ({
+      vigas:     [...s.vigas, viga],
+      secciones: s.secciones.map((sec) =>
+        sec.id === data.seccionId ? { ...sec, vigaCount: sec.vigaCount + 1 } : sec
+      ),
+    }));
+  },
+
+  deleteViga: async (id) => {
+    const viga = get().vigas.find((v) => v.id === id);
+    await del(`/api/biblioteca/vigas/${id}`);
+    set((s) => ({
+      vigas:     s.vigas.filter((v) => v.id !== id),
+      secciones: s.secciones.map((sec) =>
+        sec.id === viga?.seccionId ? { ...sec, vigaCount: Math.max(0, sec.vigaCount - 1) } : sec
+      ),
+    }));
+  },
+}));
+
+// ─── Hook público (mismo nombre que antes → cero cambios en páginas) ──────────
 
 export function useBibliotecaStore() {
-  const [libros,    setLibros]    = useState<Libro[]>([]);
-  const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
-  const [secciones, setSecciones] = useState<Seccion[]>([]);
-  const [vigas,     setVigas]     = useState<Viga[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  const state = _store();
 
-  // ── Fetch ───────────────────────────────────────────────────────────────────
+  // Trigger init on first mount (con caché automática)
+  useEffect(() => {
+    _store.getState()._init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchLibros = useCallback(async () => {
-    const res = await fetch("/api/biblioteca/libros");
-    if (res.ok) setLibros(await res.json());
-  }, []);
-
-  const fetchPrestamos = useCallback(async () => {
-    const res = await fetch("/api/biblioteca/prestamos");
-    if (res.ok) setPrestamos(await res.json());
-  }, []);
-
-  const fetchSecciones = useCallback(async () => {
-    const res = await fetch("/api/biblioteca/secciones");
-    if (res.ok) setSecciones(await res.json());
-  }, []);
-
-  const fetchVigas = useCallback(async () => {
-    const res = await fetch("/api/biblioteca/vigas");
-    if (res.ok) setVigas(await res.json());
-  }, []);
-
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([fetchLibros(), fetchPrestamos(), fetchSecciones(), fetchVigas()]);
-    setLoading(false);
-  }, [fetchLibros, fetchPrestamos, fetchSecciones, fetchVigas]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  // ── Libros ──────────────────────────────────────────────────────────────────
-
-  async function addLibro(data: { title: string; author: string; section: string; viga: string; position: string }) {
-    await fetch("/api/biblioteca/libros", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    await Promise.all([fetchLibros(), fetchSecciones(), fetchVigas()]);
-  }
-
-  async function updateLibro(id: string, data: Partial<Pick<Libro, "title" | "author" | "section" | "viga" | "position" | "status">>) {
-    await fetch(`/api/biblioteca/libros/${id}`, {
-      method:  "PUT",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    await fetchLibros();
-  }
-
-  async function deleteLibro(id: string) {
-    const res = await fetch(`/api/biblioteca/libros/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error ?? "Error al eliminar");
-    }
-    await Promise.all([fetchLibros(), fetchSecciones()]);
-  }
-
-  // ── Préstamos ───────────────────────────────────────────────────────────────
-
-  async function addPrestamo(bookId: string, person: string, dateReturn: string) {
-    await fetch("/api/biblioteca/prestamos", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ bookId, person, dateReturn }),
-    });
-    await fetchAll();
-  }
-
-  async function returnPrestamo(prestamoId: string) {
-    await fetch(`/api/biblioteca/prestamos/${prestamoId}`, {
-      method:  "PUT",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ returned: true }),
-    });
-    await fetchAll();
-  }
-
-  // ── Secciones ───────────────────────────────────────────────────────────────
-
-  async function addSeccion(data: { nombre: string; prefijo: string; descripcion: string; icono: string }) {
-    const res = await fetch("/api/biblioteca/secciones", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Error al crear sección");
-    }
-    await Promise.all([fetchSecciones(), fetchVigas()]);
-  }
-
-  async function updateSeccion(id: string, data: Partial<Pick<Seccion, "nombre" | "prefijo" | "descripcion" | "icono">>) {
-    await fetch(`/api/biblioteca/secciones/${id}`, {
-      method:  "PUT",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    await fetchSecciones();
-  }
-
-  async function deleteSeccion(id: string) {
-    const res = await fetch(`/api/biblioteca/secciones/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Error al eliminar sección");
-    }
-    await Promise.all([fetchSecciones(), fetchVigas()]);
-  }
-
-  // ── Vigas ───────────────────────────────────────────────────────────────────
-
-  async function addViga(data: { numero: string; capacidad: number; seccionId: string }) {
-    const res = await fetch("/api/biblioteca/vigas", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Error al crear viga");
-    }
-    await Promise.all([fetchVigas(), fetchSecciones()]);
-  }
-
-  async function deleteViga(id: string) {
-    const res = await fetch(`/api/biblioteca/vigas/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Error al eliminar viga");
-    }
-    await Promise.all([fetchVigas(), fetchSecciones()]);
-  }
-
-  return {
-    libros, prestamos, secciones, vigas, loading,
-    addLibro, updateLibro, deleteLibro,
-    addPrestamo, returnPrestamo,
-    addSeccion, updateSeccion, deleteSeccion,
-    addViga, deleteViga,
-    refresh: fetchAll,
-  };
+  return state;
 }

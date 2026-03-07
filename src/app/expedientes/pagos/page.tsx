@@ -37,8 +37,8 @@ export default function ControlPagos() {
           ))}
         </div>
 
-        <div className="flex flex-col flex-1 bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden">
-          <div className="flex items-center bg-[var(--muted)] px-4 py-3 border-b border-[var(--border)]">
+        <div className="flex flex-col flex-1 min-h-0 bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden">
+          <div className="flex items-center bg-[var(--muted)] px-4 py-3 border-b border-[var(--border)] flex-shrink-0">
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[140px]">Expediente</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] flex-1">Cliente</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[110px]">Cotizacion</span>
@@ -47,33 +47,35 @@ export default function ControlPagos() {
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[130px]">Progreso</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[110px]">Ultimo Abono</span>
           </div>
-          {expedientes.map((e) => {
-            const paid = getPaid(e);
-            const pct = getPercent(e);
-            const balance = e.quote - paid;
-            const lastPago = e.pagos[e.pagos.length - 1];
-            return (
-              <Link
-                key={e.id}
-                href={`/expedientes/detalle/${e.id}`}
-                className="flex items-center px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--muted)]/30 transition-colors cursor-pointer"
-              >
-                <span className="font-primary text-xs font-semibold text-[var(--primary)] w-[140px]">{e.num}</span>
-                <span className="font-secondary text-[13px] text-[var(--foreground)] flex-1">{e.client}</span>
-                <span className="font-primary text-[13px] text-[var(--foreground)] w-[110px]">${e.quote.toLocaleString("es-MX")}</span>
-                <span className="font-primary text-[13px] w-[110px] text-[#10B981]">${paid.toLocaleString("es-MX")}</span>
-                <span className="font-primary text-[13px] font-semibold w-[110px]" style={{ color: balance > 0 ? "#EF4444" : "var(--muted-foreground)" }}>
-                  ${balance.toLocaleString("es-MX")}
-                </span>
-                <div className="flex items-center gap-2 w-[130px]">
-                  <Progress value={pct} className="w-[80px]" />
-                  <span className="font-primary text-xs">{pct}%</span>
-                </div>
-                <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[110px]">{lastPago?.date || "—"}</span>
-              </Link>
-            );
-          })}
-          <div className="px-4 py-3">
+          <div className="overflow-y-auto flex-1">
+            {expedientes.map((e) => {
+              const paid = getPaid(e);
+              const pct = getPercent(e);
+              const balance = e.quote - paid;
+              const lastPago = e.pagos[e.pagos.length - 1];
+              return (
+                <Link
+                  key={e.id}
+                  href={`/expedientes/detalle/${e.id}`}
+                  className="flex items-center px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--muted)]/30 transition-colors cursor-pointer"
+                >
+                  <span className="font-primary text-xs font-semibold text-[var(--primary)] w-[140px]">{e.num}</span>
+                  <span className="font-secondary text-[13px] text-[var(--foreground)] flex-1">{e.client}</span>
+                  <span className="font-primary text-[13px] text-[var(--foreground)] w-[110px]">${e.quote.toLocaleString("es-MX")}</span>
+                  <span className="font-primary text-[13px] w-[110px] text-[#10B981]">${paid.toLocaleString("es-MX")}</span>
+                  <span className="font-primary text-[13px] font-semibold w-[110px]" style={{ color: balance > 0 ? "#EF4444" : "var(--muted-foreground)" }}>
+                    ${balance.toLocaleString("es-MX")}
+                  </span>
+                  <div className="flex items-center gap-2 w-[130px]">
+                    <Progress value={pct} className="w-[80px]" />
+                    <span className="font-primary text-xs">{pct}%</span>
+                  </div>
+                  <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[110px]">{lastPago?.date || "—"}</span>
+                </Link>
+              );
+            })}
+          </div>
+          <div className="px-4 py-3 border-t border-[var(--border)] flex-shrink-0">
             <span className="font-secondary text-xs text-[var(--muted-foreground)]">{expedientes.length} expedientes</span>
           </div>
         </div>

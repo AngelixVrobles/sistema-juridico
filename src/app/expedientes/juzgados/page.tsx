@@ -74,8 +74,8 @@ export default function Juzgados() {
           </div>
         )}
 
-        <div className="flex flex-col flex-1 bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden">
-          <div className="flex items-center bg-[var(--muted)] px-4 py-3 border-b border-[var(--border)]">
+        <div className="flex flex-col flex-1 min-h-0 bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden">
+          <div className="flex items-center bg-[var(--muted)] px-4 py-3 border-b border-[var(--border)] flex-shrink-0">
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] flex-1">Nombre del Juzgado</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[140px]">Jurisdiccion</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[200px]">Direccion</span>
@@ -84,33 +84,35 @@ export default function Juzgados() {
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[100px]">Acciones</span>
           </div>
 
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center py-16">
-              <span className="font-secondary text-sm text-[var(--muted-foreground)]">Cargando juzgados...</span>
-            </div>
-          ) : juzgados.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center py-16">
-              <span className="font-secondary text-sm text-[var(--muted-foreground)]">No hay juzgados registrados. Agrega el primero.</span>
-            </div>
-          ) : (
-            juzgados.map((j) => (
-              <div key={j.id} className="flex items-center px-4 py-3 border-b border-[var(--border)]">
-                <span className="font-secondary text-[13px] font-medium text-[var(--foreground)] flex-1">{j.nombre}</span>
-                <span className="font-primary text-xs text-[var(--muted-foreground)] w-[140px]">{j.jurisdiccion || "—"}</span>
-                <span className="font-primary text-xs text-[var(--muted-foreground)] w-[200px] truncate">{j.direccion || "—"}</span>
-                <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{j.telefono || "—"}</span>
-                <span className="font-primary text-[13px] font-semibold text-[var(--foreground)] w-[90px]">{j.expedientes}</span>
-                <div className="flex items-center gap-2 w-[100px]">
-                  <Button variant="ghost" icon="edit" className="h-7 text-xs px-2" onClick={() => openEdit(j)}>Editar</Button>
-                  <button onClick={() => handleDelete(j.id, j.nombre)}
-                    className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-colors">
-                    <Icon name="delete" size={16} />
-                  </button>
-                </div>
+          <div className="overflow-y-auto flex-1">
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <span className="font-secondary text-sm text-[var(--muted-foreground)]">Cargando juzgados...</span>
               </div>
-            ))
-          )}
-          <div className="px-4 py-3">
+            ) : juzgados.length === 0 ? (
+              <div className="flex items-center justify-center py-16">
+                <span className="font-secondary text-sm text-[var(--muted-foreground)]">No hay juzgados registrados. Agrega el primero.</span>
+              </div>
+            ) : (
+              juzgados.map((j) => (
+                <div key={j.id} className="flex items-center px-4 py-3 border-b border-[var(--border)]">
+                  <span className="font-secondary text-[13px] font-medium text-[var(--foreground)] flex-1">{j.nombre}</span>
+                  <span className="font-primary text-xs text-[var(--muted-foreground)] w-[140px]">{j.jurisdiccion || "—"}</span>
+                  <span className="font-primary text-xs text-[var(--muted-foreground)] w-[200px] truncate">{j.direccion || "—"}</span>
+                  <span className="font-primary text-xs text-[var(--muted-foreground)] w-[120px]">{j.telefono || "—"}</span>
+                  <span className="font-primary text-[13px] font-semibold text-[var(--foreground)] w-[90px]">{j.expedientes}</span>
+                  <div className="flex items-center gap-2 w-[100px]">
+                    <Button variant="ghost" icon="edit" className="h-7 text-xs px-2" onClick={() => openEdit(j)}>Editar</Button>
+                    <button onClick={() => handleDelete(j.id, j.nombre)}
+                      className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-colors">
+                      <Icon name="delete" size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="px-4 py-3 border-t border-[var(--border)] flex-shrink-0">
             <span className="font-secondary text-xs text-[var(--muted-foreground)]">{juzgados.length} juzgado{juzgados.length !== 1 ? "s" : ""}</span>
           </div>
         </div>

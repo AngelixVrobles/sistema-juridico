@@ -1,23 +1,32 @@
-import { Icon } from "@/components/Icon";
+"use client";
+import { Icon }             from "@/components/Icon";
+import { useSettingsStore } from "@/store/settings";
 
 export default function Home() {
+  const { officeName } = useSettingsStore();
+
   return (
-    <div className="flex flex-col items-center justify-center gap-12 h-full bg-[var(--background)]">
+    <div className="flex flex-col items-center justify-center gap-10 h-full bg-[var(--background)]">
+
       {/* Logo */}
       <Icon name="balance" size={64} outlined className="text-[var(--primary)]" />
 
-      {/* Title */}
-      <div className="flex flex-col items-center gap-2">
+      {/* Título */}
+      <div className="flex flex-col items-center gap-2 text-center px-4">
+        <span className="font-secondary text-sm font-medium text-[var(--primary)] tracking-wide uppercase">
+          {officeName}
+        </span>
         <h1 className="font-primary text-[32px] font-bold text-[var(--foreground)]">
-          Sistema de Gestion Juridica
+          Sistema de Gestión Jurídica
         </h1>
         <p className="font-secondary text-base text-[var(--muted-foreground)]">
-          Selecciona el modulo con el que deseas trabajar
+          Selecciona el módulo con el que deseas trabajar
         </p>
       </div>
 
-      {/* Cards */}
-      <div className="flex gap-8">
+      {/* Módulos */}
+      <div className="flex gap-8 flex-wrap justify-center px-4">
+
         {/* Biblioteca */}
         <a
           href="/biblioteca/dashboard"
@@ -27,10 +36,10 @@ export default function Home() {
             <Icon name="menu_book" size={40} outlined className="text-white" />
           </div>
           <h2 className="font-primary text-[22px] font-bold text-[var(--foreground)]">
-            Biblioteca Juridica
+            Biblioteca Jurídica
           </h2>
           <p className="font-secondary text-sm text-[var(--muted-foreground)] text-center w-[320px]">
-            Organiza y gestiona tu coleccion de libros por secciones, vigas y posiciones. Control de prestamos y busqueda avanzada.
+            Organiza y gestiona tu colección de libros por secciones, vigas y posiciones. Control de préstamos y búsqueda avanzada.
           </p>
           <div className="flex items-center gap-[6px] rounded-full bg-[var(--primary)] px-4 py-[10px] h-10">
             <Icon name="arrow_forward" size={20} className="text-[var(--primary-foreground)]" />
@@ -49,7 +58,7 @@ export default function Home() {
             <Icon name="folder_open" size={40} outlined className="text-white" />
           </div>
           <h2 className="font-primary text-[22px] font-bold text-[var(--foreground)]">
-            Expedientes Juridicos
+            Expedientes Jurídicos
           </h2>
           <p className="font-secondary text-sm text-[var(--muted-foreground)] text-center w-[320px]">
             Administra tus expedientes y casos. Documentos vinculados, control de pagos, abonos, notas y seguimiento completo.
@@ -61,15 +70,16 @@ export default function Home() {
             </span>
           </div>
         </a>
+
       </div>
 
       {/* Footer */}
-      <div className="flex items-center gap-4">
-        <span className="font-secondary text-xs text-[var(--muted-foreground)]">
-          Lic. Martinez — Bufete Juridico Martinez &amp; Asociados
-        </span>
+      <div className="flex items-center gap-3">
+        <span className="font-secondary text-xs text-[var(--muted-foreground)]">{officeName}</span>
+        <span className="font-primary text-[11px] text-[var(--muted-foreground)] opacity-50">·</span>
         <span className="font-primary text-[11px] text-[var(--muted-foreground)]">v1.0.0</span>
       </div>
+
     </div>
   );
 }
