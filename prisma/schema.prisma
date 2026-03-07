@@ -45,6 +45,7 @@ model Libro {
   viga      Viga?      @relation(fields: [vigaId], references: [id])
   posicion  String     @default("")
   estado    String     @default("Disponible")
+  portada   String     @default("")
   prestamos Prestamo[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt

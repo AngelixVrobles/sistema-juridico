@@ -24,6 +24,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     vigaId:    libro.viga?.id ?? null,
     position:  libro.posicion,
     status:    libro.estado,
+    portada:   libro.portada,
     createdAt: fmt(libro.createdAt),
   });
 }
@@ -78,6 +79,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     vigaId:    libro.viga?.id ?? null,
     position:  libro.posicion,
     status:    libro.estado,
+    portada:   libro.portada,
     createdAt: fmt(libro.createdAt),
   });
 }

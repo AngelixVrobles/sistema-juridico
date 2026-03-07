@@ -66,7 +66,9 @@ function createWindow() {
     minWidth:        900,
     minHeight:       600,
     title:           "Sistema Jurídico",
-    icon:            path.join(__dirname, "icon.png"),
+    icon:            isDev
+      ? path.join(__dirname, "resources", "icon.ico")
+      : path.join(process.resourcesPath, "icon.ico"),
     backgroundColor: "#0F172A",  // mismo fondo que la app
     webPreferences: {
       preload:          path.join(__dirname, "preload.js"),

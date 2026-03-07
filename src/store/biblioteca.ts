@@ -16,6 +16,7 @@ export interface Libro {
   vigaId: string | null;
   position: string;
   status: "Disponible" | "Prestado";
+  portada: string;
   createdAt: string;
 }
 
@@ -117,9 +118,10 @@ interface BibliotecaState {
   _refetchMeta: () => Promise<void>;
 
   // Libros
-  addLibro:    (data: { title: string; author: string; section: string; viga: string; position: string }) => Promise<void>;
-  updateLibro: (id: string, data: Partial<Pick<Libro, "title" | "author" | "section" | "viga" | "position" | "status">>) => Promise<void>;
-  deleteLibro: (id: string) => Promise<void>;
+  addLibro:      (data: { title: string; author: string; section: string; viga: string; position: string }, imageFile?: File | null) => Promise<void>;
+  updateLibro:   (id: string, data: Partial<Pick<Libro, "title" | "author" | "section" | "viga" | "position" | "status">>) => Promise<void>;
+  deleteLibro:   (id: string) => Promise<void>;
+  uploadPortada: (id: string, imageFile: File) => Promise<void>;
 
   // Préstamos
   addPrestamo:    (bookId: string, person: string, dateReturn: string) => Promise<void>;
@@ -199,10 +201,41 @@ const _store = create<BibliotecaState>()((set, get) => ({
 
   // ── Libros ───────────────────────────────────────────────────────────────
 
-  addLibro: async (data) => {
+  addLibro: async (data, imageFile) => {
     const libro = await postJson<Libro>("/api/biblioteca/libros", data);
+
+    // Upload de portada si se proporcionó
+    if (imageFile) {
+      try {
+        const formData = new FormData();
+        formData.append("portada", imageFile);
+        const res = await fetch(api(`/api/biblioteca/libros/${libro.id}/portada`), {
+          method: "POST",
+          body:   formData,
+        });
+        if (res.ok) {
+          const { portada } = await res.json();
+          libro.portada = portada;
+        }
+      } catch { /* no bloquear si falla el upload */ }
+    }
+
     set((s) => ({ libros: [libro, ...s.libros] }));
     get()._refetchMeta(); // actualizar conteos en background
+  },
+
+  uploadPortada: async (id, imageFile) => {
+    const formData = new FormData();
+    formData.append("portada", imageFile);
+    const res = await fetch(api(`/api/biblioteca/libros/${id}/portada`), {
+      method: "POST",
+      body:   formData,
+    });
+    if (!res.ok) throw new Error("Error al subir la portada");
+    const { portada } = await res.json();
+    set((s) => ({
+      libros: s.libros.map((b) => b.id === id ? { ...b, portada } : b),
+    }));
   },
 
   updateLibro: async (id, data) => {

@@ -38,7 +38,7 @@ export function Sidebar({ title, items, backHref = "/" }: SidebarProps) {
       </div>
 
       {/* Nav Items */}
-      <nav className="flex flex-col flex-1 px-4 gap-1 overflow-y-auto py-4 min-h-0">
+      <nav className="flex flex-col flex-1 px-4 gap-1 py-4">
         {/* Back to main menu */}
         <a
           href={backHref}

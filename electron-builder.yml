@@ -42,17 +42,28 @@ extraResources:
     to: "app/public"
 
 # ─── Icono de la aplicación ───────────────────────────────────────────────────
-# Coloca tu icono en electron/resources/icon.ico (256x256 mínimo)
-# win:
-#   icon: electron/resources/icon.ico
+# Para personalizar el ícono, reemplaza los archivos en electron/resources/:
+#   Windows → icon.ico  (mínimo 256×256 px, formato ICO multi-resolución)
+#   macOS   → icon.icns (generado con `iconutil` a partir de un .iconset de Mac)
+#
+# El ícono aparecerá en: ventana de la app, barra de tareas,
+# acceso directo del escritorio e instalador.
 
 # ─── Windows ─────────────────────────────────────────────────────────────────
 win:
+  icon: electron/resources/icon.ico
   target:
     - target: nsis
       arch: [x64]
     - target: portable
       arch: [x64]
+
+# ─── macOS ────────────────────────────────────────────────────────────────────
+mac:
+  icon: electron/resources/icon.icns
+  target:
+    - target: dmg
+      arch: [x64, arm64]
 
 # ─── Instalador NSIS ─────────────────────────────────────────────────────────
 nsis:
