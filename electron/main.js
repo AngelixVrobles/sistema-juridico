@@ -11,15 +11,15 @@ const { app, BrowserWindow, shell, dialog, ipcMain, Menu } = require("electron")
 
 // Eliminar el menú nativo de Electron para una apariencia profesional
 Menu.setApplicationMenu(null);
-const path   = require("path");
-const fs     = require("fs");
-const http   = require("http");
+const path = require("path");
+const fs = require("fs");
+const http = require("http");
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-const isDev        = !app.isPackaged;
-const DEV_URL      = "http://localhost:3000";
-const NEXT_PORT    = 3131; // Puerto fijo para producción (diferente al dev)
-const PROD_URL     = `http://localhost:${NEXT_PORT}`;
+const isDev = !app.isPackaged;
+const DEV_URL = "http://localhost:3000";
+const NEXT_PORT = 3131; // Puerto fijo para producción (diferente al dev)
+const PROD_URL = `http://localhost:${NEXT_PORT}`;
 
 /**
  * Lee la URL del servidor remoto desde la configuración persistida en localStorage.
@@ -47,7 +47,7 @@ function readRemoteServerUrl() {
 /** Ruta al servidor standalone empaquetado */
 const STANDALONE_DIR = isDev
   ? null
-  : path.join(process.resourcesPath, "app", ".next", "standalone");
+  : path.join(process.resourcesPath, "app");
 
 /** Ruta al server.js de Next.js standalone */
 const SERVER_JS = STANDALONE_DIR
@@ -55,26 +55,26 @@ const SERVER_JS = STANDALONE_DIR
   : null;
 
 // ─── Estado ───────────────────────────────────────────────────────────────────
-let mainWindow  = null;
+let mainWindow = null;
 let serverChild = null;
 
 // ─── Ventana principal ────────────────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width:           1280,
-    height:          800,
-    minWidth:        900,
-    minHeight:       600,
-    title:           "Sistema Jurídico",
-    icon:            isDev
+    width: 1280,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    title: "Sistema Jurídico",
+    icon: isDev
       ? path.join(__dirname, "resources", "icon.ico")
       : path.join(process.resourcesPath, "icon.ico"),
     backgroundColor: "#0F172A",  // mismo fondo que la app
     webPreferences: {
-      preload:          path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration:  false,
-      sandbox:          true,
+      nodeIntegration: false,
+      sandbox: true,
     },
     show: false, // Se mostrará cuando el servidor esté listo
   });
@@ -94,18 +94,21 @@ function createWindow() {
 }
 
 // ─── Esperar que el servidor HTTP responda ────────────────────────────────────
-function waitForServer(url, retries = 40, delay = 500) {
+function waitForServer(url, retries = 60, delay = 1000) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
 
     const check = () => {
-      http.get(url, (res) => {
+      const req = http.get(url, (res) => {
         if (res.statusCode < 500) {
           resolve();
         } else {
           retry();
         }
-      }).on("error", retry);
+        res.resume();
+      });
+      req.on("error", retry);
+      req.setTimeout(3000, () => { req.destroy(); retry(); });
     };
 
     const retry = () => {
@@ -132,21 +135,26 @@ function startNextServer() {
     // Variables de entorno para el servidor
     const env = {
       ...process.env,
-      NODE_ENV:        "production",
-      PORT:            String(NEXT_PORT),
-      HOSTNAME:        "127.0.0.1",
-      // Apuntar la DB a userData para persistencia entre actualizaciones
-      DATABASE_URL:    `file:${path.join(app.getPath("userData"), "biblioteca.db")}`,
-      // Archivos subidos → userData también
-      UPLOAD_DIR:      path.join(app.getPath("userData"), "uploads"),
+      NODE_ENV: "production",
+      PORT: String(NEXT_PORT),
+      HOSTNAME: "127.0.0.1",
+      DATABASE_URL: `file:${path.join(app.getPath("userData"), "biblioteca.db")}`,
+      UPLOAD_DIR: path.join(app.getPath("userData"), "uploads"),
+      // Permite que Electron actúe como Node.js puro para resolución de módulos
+      ELECTRON_RUN_AS_NODE: "1",
+      NODE_PATH: path.join(STANDALONE_DIR, "node_modules"),
     };
 
     // Copiar DB si es la primera vez
     ensureDatabase(env.DATABASE_URL);
 
-    serverChild = require("child_process").fork(SERVER_JS, [], {
+    let serverError = null;
+
+    // spawn() con ELECTRON_RUN_AS_NODE=1: el proceso hijo resuelve módulos
+    // desde su propio directorio (resources/app/node_modules/next)
+    serverChild = require("child_process").spawn(process.execPath, [SERVER_JS], {
       env,
-      cwd:   STANDALONE_DIR,
+      cwd: STANDALONE_DIR,
       stdio: "pipe",
     });
 
@@ -157,20 +165,33 @@ function startNextServer() {
 
     serverChild.stderr?.on("data", (d) => {
       const msg = d.toString().trim();
-      if (msg) console.error("[Next.js ERR]", msg);
+      if (msg) {
+        console.error("[Next.js ERR]", msg);
+        serverError = msg;
+      }
     });
 
     serverChild.on("exit", (code) => {
       console.log(`[Next.js] Proceso terminado con código ${code}`);
       serverChild = null;
+      if (code !== 0 && code !== null) {
+        reject(new Error(
+          `El servidor terminó inesperadamente (código ${code}).` +
+          (serverError ? `\n\n${serverError}` : "")
+        ));
+      }
     });
 
-    serverChild.on("error", reject);
+    serverChild.on("error", (err) => {
+      reject(new Error(`No se pudo iniciar el servidor: ${err.message}`));
+    });
 
     // Esperar que el servidor HTTP esté listo
-    waitForServer(PROD_URL)
+    waitForServer(PROD_URL, 60, 1000)
       .then(resolve)
-      .catch(reject);
+      .catch((err) => reject(new Error(
+        err.message + (serverError ? `\n\n${serverError}` : "")
+      )));
   });
 }
 
@@ -178,7 +199,7 @@ function startNextServer() {
 function ensureDatabase(dbUrl) {
   // dbUrl tiene el formato "file:/path/to/db"
   const dbPath = dbUrl.replace("file:", "");
-  const dbDir  = path.dirname(dbPath);
+  const dbDir = path.dirname(dbPath);
 
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });

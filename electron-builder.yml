@@ -5,6 +5,11 @@ appId:   "mx.com.sistemajuridico.app"
 productName: "Sistema Jurídico"
 copyright: "© 2025 Sistema Jurídico"
 
+# CLAVE: Copia node_modules del servidor next.js al paquete después del pack.
+# electron-builder los filtra de extraResources, pero afterPack se ejecuta
+# antes de crear el instalador NSIS/DMG, por lo que sí se incluyen.
+afterPack: "./scripts/copy-standalone-modules.js"
+
 # ─── Directorios ─────────────────────────────────────────────────────────────
 directories:
   output: dist-electron
@@ -12,12 +17,8 @@ directories:
 
 # ─── Archivos a incluir en el paquete ────────────────────────────────────────
 files:
-  # Proceso principal de Electron
   - electron/main.js
   - electron/preload.js
-  # Build de Next.js standalone (generado por npm run build + prepare-electron)
-  - .next/standalone/**
-  # node_modules mínimos que necesita el main process (electron mismo los carga)
   - "!node_modules/**"
   - "!src/**"
   - "!prisma/migrations/**"

@@ -4,11 +4,11 @@ directories:
 appId: mx.com.sistemajuridico.app
 productName: Sistema Jurídico
 copyright: © 2025 Sistema Jurídico
+afterPack: ./scripts/copy-standalone-modules.js
 files:
   - filter:
       - electron/main.js
       - electron/preload.js
-      - .next/standalone/**
       - '!node_modules/**'
       - '!src/**'
       - '!prisma/migrations/**'
