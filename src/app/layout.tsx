@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Geist } from "next/font/google";
-import { ToastProvider } from "@/context/ToastContext";
+import { ToastProvider }  from "@/context/ToastContext";
+import { ThemeProvider }  from "@/context/ThemeProvider";
 import "./globals.css";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -38,7 +39,11 @@ export default function RootLayout({
       <body
         className={`${jetbrainsMono.variable} ${geist.variable} h-full antialiased bg-[var(--background)] text-[var(--foreground)]`}
       >
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </ToastProvider>
       </body>
     </html>
   );

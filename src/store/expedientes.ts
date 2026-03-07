@@ -1,7 +1,9 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { create }           from "zustand";
+import { useEffect }        from "react";
+import { useSettingsStore } from "./settings";
 
-// ─── Tipos ─────────────────────────────────────────────────────────────────────
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export interface Pago {
   id: string;
@@ -25,8 +27,6 @@ export interface Documento {
   uploadDate: string;
 }
 
-// ─── Hook de clientes ────────────────────────────────────────────────────────────
-
 export interface Cliente {
   id:        string;
   nombre:    string;
@@ -38,51 +38,13 @@ export interface Cliente {
   updatedAt: string;
 }
 
-export function useClientesStore() {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [loading,  setLoading]  = useState(true);
-
-  const fetchClientes = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/clientes");
-    if (res.ok) setClientes(await res.json());
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { fetchClientes(); }, [fetchClientes]);
-
-  async function addCliente(data: Omit<Cliente, "id" | "createdAt" | "updatedAt">) {
-    const res = await fetch("/api/clientes", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Error al crear cliente");
-    }
-    await fetchClientes();
-  }
-
-  async function updateCliente(id: string, data: Partial<Omit<Cliente, "id" | "createdAt" | "updatedAt">>) {
-    const res = await fetch(`/api/clientes/${id}`, {
-      method:  "PUT",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Error al actualizar cliente");
-    }
-    await fetchClientes();
-  }
-
-  async function deleteCliente(id: string) {
-    await fetch(`/api/clientes/${id}`, { method: "DELETE" });
-    await fetchClientes();
-  }
-
-  return { clientes, loading, addCliente, updateCliente, deleteCliente, refresh: fetchClientes };
+export interface Juzgado {
+  id: string;
+  nombre: string;
+  jurisdiccion: string;
+  direccion: string;
+  telefono: string;
+  expedientes: number;
 }
 
 export interface Expediente {
@@ -121,7 +83,7 @@ export interface NewExpedienteData {
   paymentMethod: string;
 }
 
-// ─── Utilidades de cálculo ──────────────────────────────────────────────────────
+// ─── Utilidades de cálculo ───────────────────────────────────────────────────
 
 export function getPaid(exp: Expediente): number {
   return exp.pagos.reduce((sum, p) => sum + p.amount, 0);
@@ -132,163 +94,327 @@ export function getPercent(exp: Expediente): number {
   return Math.min(100, Math.round((getPaid(exp) / exp.quote) * 100));
 }
 
-// ─── Hook de juzgados ──────────────────────────────────────────────────────────
+// ─── Helpers de API ──────────────────────────────────────────────────────────
 
-export interface Juzgado {
-  id: string;
-  nombre: string;
-  jurisdiccion: string;
-  direccion: string;
-  telefono: string;
-  expedientes: number;
+const CACHE_TTL = 30_000;
+
+function api(path: string): string {
+  const { serverUrl } = useSettingsStore.getState();
+  const base = serverUrl ? serverUrl.replace(/\/$/, "") : "";
+  return `${base}${path}`;
 }
+
+async function getJson<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(api(path));
+    if (res.ok) return res.json();
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(api(path), {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as Record<string,string>).error ?? "Error en la petición");
+  }
+  return res.json();
+}
+
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(api(path), {
+    method:  "PUT",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Error al actualizar");
+  return res.json();
+}
+
+async function del(path: string): Promise<void> {
+  const res = await fetch(api(path), { method: "DELETE" });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as Record<string,string>).error ?? "Error al eliminar");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLIENTES STORE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface ClientesState {
+  clientes:    Cliente[];
+  loading:     boolean;
+  lastFetched: number;
+  _init:       () => Promise<void>;
+  refresh:     () => Promise<void>;
+  addCliente:    (data: Omit<Cliente, "id" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateCliente: (id: string, data: Partial<Omit<Cliente, "id" | "createdAt" | "updatedAt">>) => Promise<void>;
+  deleteCliente: (id: string) => Promise<void>;
+}
+
+let _clientesPoll: ReturnType<typeof setInterval> | null = null;
+
+const _clientesStore = create<ClientesState>()((set, get) => ({
+  clientes:    [],
+  loading:     false,
+  lastFetched: 0,
+
+  _init: async () => {
+    if (Date.now() - get().lastFetched < CACHE_TTL) return;
+    await get().refresh();
+    if (typeof window !== "undefined" && !_clientesPoll) {
+      const ms = (useSettingsStore.getState().pollInterval || 30) * 1000;
+      _clientesPoll = setInterval(() => _clientesStore.getState().refresh(), ms);
+    }
+  },
+
+  refresh: async () => {
+    set({ loading: true });
+    const clientes = await getJson<Cliente[]>("/api/clientes");
+    set({ clientes: clientes ?? get().clientes, loading: false, lastFetched: Date.now() });
+  },
+
+  addCliente: async (data) => {
+    const cliente = await postJson<Cliente>("/api/clientes", data);
+    set((s) => ({ clientes: [cliente, ...s.clientes] }));
+  },
+
+  updateCliente: async (id, data) => {
+    await putJson(`/api/clientes/${id}`, data);
+    set((s) => ({
+      clientes: s.clientes.map((c) => c.id === id ? { ...c, ...data } : c),
+    }));
+  },
+
+  deleteCliente: async (id) => {
+    await del(`/api/clientes/${id}`);
+    set((s) => ({ clientes: s.clientes.filter((c) => c.id !== id) }));
+  },
+}));
+
+export function useClientesStore() {
+  const state = _clientesStore();
+  useEffect(() => { _clientesStore.getState()._init(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return state;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JUZGADOS STORE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface JuzgadosState {
+  juzgados:    Juzgado[];
+  loading:     boolean;
+  lastFetched: number;
+  _init:       () => Promise<void>;
+  refresh:     () => Promise<void>;
+  addJuzgado:    (data: Omit<Juzgado, "id" | "expedientes">) => Promise<void>;
+  updateJuzgado: (id: string, data: Partial<Omit<Juzgado, "id" | "expedientes">>) => Promise<void>;
+  deleteJuzgado: (id: string) => Promise<void>;
+}
+
+let _juzgadosPoll: ReturnType<typeof setInterval> | null = null;
+
+const _juzgadosStore = create<JuzgadosState>()((set, get) => ({
+  juzgados:    [],
+  loading:     false,
+  lastFetched: 0,
+
+  _init: async () => {
+    if (Date.now() - get().lastFetched < CACHE_TTL) return;
+    await get().refresh();
+    if (typeof window !== "undefined" && !_juzgadosPoll) {
+      const ms = (useSettingsStore.getState().pollInterval || 30) * 1000;
+      _juzgadosPoll = setInterval(() => _juzgadosStore.getState().refresh(), ms);
+    }
+  },
+
+  refresh: async () => {
+    set({ loading: true });
+    const juzgados = await getJson<Juzgado[]>("/api/juzgados");
+    set({ juzgados: juzgados ?? get().juzgados, loading: false, lastFetched: Date.now() });
+  },
+
+  addJuzgado: async (data) => {
+    const juzgado = await postJson<Juzgado>("/api/juzgados", data);
+    set((s) => ({ juzgados: [...s.juzgados, juzgado] }));
+  },
+
+  updateJuzgado: async (id, data) => {
+    await putJson(`/api/juzgados/${id}`, data);
+    set((s) => ({
+      juzgados: s.juzgados.map((j) => j.id === id ? { ...j, ...data } : j),
+    }));
+  },
+
+  deleteJuzgado: async (id) => {
+    await del(`/api/juzgados/${id}`);
+    set((s) => ({ juzgados: s.juzgados.filter((j) => j.id !== id) }));
+  },
+}));
 
 export function useJuzgadosStore() {
-  const [juzgados, setJuzgados] = useState<Juzgado[]>([]);
-  const [loading,  setLoading]  = useState(true);
-
-  const fetchJuzgados = useCallback(async () => {
-    const res = await fetch("/api/juzgados");
-    if (res.ok) setJuzgados(await res.json());
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { fetchJuzgados(); }, [fetchJuzgados]);
-
-  async function addJuzgado(data: Omit<Juzgado, "id" | "expedientes">) {
-    const res = await fetch("/api/juzgados", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Error al crear juzgado");
-    }
-    await fetchJuzgados();
-  }
-
-  async function updateJuzgado(id: string, data: Partial<Omit<Juzgado, "id" | "expedientes">>) {
-    await fetch(`/api/juzgados/${id}`, {
-      method:  "PUT",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    await fetchJuzgados();
-  }
-
-  async function deleteJuzgado(id: string) {
-    await fetch(`/api/juzgados/${id}`, { method: "DELETE" });
-    await fetchJuzgados();
-  }
-
-  return { juzgados, loading, addJuzgado, updateJuzgado, deleteJuzgado, refresh: fetchJuzgados };
+  const state = _juzgadosStore();
+  useEffect(() => { _juzgadosStore.getState()._init(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return state;
 }
 
-// ─── Hook principal de expedientes ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPEDIENTES STORE
+// ═══════════════════════════════════════════════════════════════════════════════
 
-export function useExpedientesStore() {
-  const [expedientes, setExpedientes] = useState<Expediente[]>([]);
-  const [loading,     setLoading]     = useState(true);
+interface ExpedientesState {
+  expedientes: Expediente[];
+  loading:     boolean;
+  lastFetched: number;
+  _init:       () => Promise<void>;
+  refresh:     () => Promise<void>;
 
-  const fetchExpedientes = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/expedientes");
-    if (res.ok) setExpedientes(await res.json());
-    setLoading(false);
-  }, []);
+  addExpediente:    (data: NewExpedienteData) => Promise<string>;
+  updateExpediente: (id: string, data: Partial<Omit<Expediente, "id" | "num" | "pagos" | "notas" | "documentos" | "createdAt">>) => Promise<void>;
+  deleteExpediente: (id: string) => Promise<void>;
 
-  useEffect(() => { fetchExpedientes(); }, [fetchExpedientes]);
+  addPago:    (expedienteId: string, amount: number, desc?: string) => Promise<void>;
+  deletePago: (expedienteId: string, pagoId: string) => Promise<void>;
 
-  // ── Expedientes ─────────────────────────────────────────────────────────────
+  addNota:    (expedienteId: string, text: string) => Promise<void>;
+  deleteNota: (expedienteId: string, notaId: string) => Promise<void>;
 
-  async function addExpediente(data: NewExpedienteData): Promise<string> {
-    const res = await fetch("/api/expedientes", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    const exp: Expediente = await res.json();
-    await fetchExpedientes();
+  addDocumento:    (expedienteId: string, file: File) => Promise<void>;
+  deleteDocumento: (expedienteId: string, docId: string) => Promise<void>;
+}
+
+let _expedientesPoll: ReturnType<typeof setInterval> | null = null;
+
+const _expedientesStore = create<ExpedientesState>()((set, get) => ({
+  expedientes: [],
+  loading:     false,
+  lastFetched: 0,
+
+  _init: async () => {
+    if (Date.now() - get().lastFetched < CACHE_TTL) return;
+    await get().refresh();
+    if (typeof window !== "undefined" && !_expedientesPoll) {
+      const ms = (useSettingsStore.getState().pollInterval || 30) * 1000;
+      _expedientesPoll = setInterval(() => _expedientesStore.getState().refresh(), ms);
+    }
+  },
+
+  refresh: async () => {
+    set({ loading: true });
+    const expedientes = await getJson<Expediente[]>("/api/expedientes");
+    set({ expedientes: expedientes ?? get().expedientes, loading: false, lastFetched: Date.now() });
+  },
+
+  // ── Expedientes ───────────────────────────────────────────────────────────
+
+  addExpediente: async (data) => {
+    const exp = await postJson<Expediente>("/api/expedientes", data);
+    set((s) => ({ expedientes: [exp, ...s.expedientes] }));
     return exp.id;
-  }
+  },
 
-  async function updateExpediente(
-    id: string,
-    data: Partial<Omit<Expediente, "id" | "num" | "pagos" | "notas" | "documentos" | "createdAt">>
-  ) {
-    await fetch(`/api/expedientes/${id}`, {
-      method:  "PUT",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data),
-    });
-    await fetchExpedientes();
-  }
+  updateExpediente: async (id, data) => {
+    await putJson(`/api/expedientes/${id}`, data);
+    set((s) => ({
+      expedientes: s.expedientes.map((e) => e.id === id ? { ...e, ...data } : e),
+    }));
+  },
 
-  async function deleteExpediente(id: string) {
-    await fetch(`/api/expedientes/${id}`, { method: "DELETE" });
-    await fetchExpedientes();
-  }
+  deleteExpediente: async (id) => {
+    await del(`/api/expedientes/${id}`);
+    set((s) => ({ expedientes: s.expedientes.filter((e) => e.id !== id) }));
+  },
 
-  // ── Pagos ───────────────────────────────────────────────────────────────────
+  // ── Pagos ─────────────────────────────────────────────────────────────────
 
-  async function addPago(expedienteId: string, amount: number, desc = "Abono") {
-    await fetch(`/api/expedientes/${expedienteId}/pagos`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ amount, desc }),
-    });
-    await fetchExpedientes();
-  }
+  addPago: async (expedienteId, amount, desc = "Abono") => {
+    const pago = await postJson<Pago>(`/api/expedientes/${expedienteId}/pagos`, { amount, desc });
+    set((s) => ({
+      expedientes: s.expedientes.map((e) =>
+        e.id === expedienteId ? { ...e, pagos: [...e.pagos, pago] } : e
+      ),
+    }));
+  },
 
-  async function deletePago(expedienteId: string, pagoId: string) {
-    await fetch(`/api/expedientes/${expedienteId}/pagos/${pagoId}`, { method: "DELETE" });
-    await fetchExpedientes();
-  }
+  deletePago: async (expedienteId, pagoId) => {
+    await del(`/api/expedientes/${expedienteId}/pagos/${pagoId}`);
+    set((s) => ({
+      expedientes: s.expedientes.map((e) =>
+        e.id === expedienteId
+          ? { ...e, pagos: e.pagos.filter((p) => p.id !== pagoId) }
+          : e
+      ),
+    }));
+  },
 
-  // ── Notas ───────────────────────────────────────────────────────────────────
+  // ── Notas ─────────────────────────────────────────────────────────────────
 
-  async function addNota(expedienteId: string, text: string) {
-    await fetch(`/api/expedientes/${expedienteId}/notas`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ text }),
-    });
-    await fetchExpedientes();
-  }
+  addNota: async (expedienteId, text) => {
+    const nota = await postJson<Nota>(`/api/expedientes/${expedienteId}/notas`, { text });
+    set((s) => ({
+      expedientes: s.expedientes.map((e) =>
+        e.id === expedienteId ? { ...e, notas: [...e.notas, nota] } : e
+      ),
+    }));
+  },
 
-  async function deleteNota(expedienteId: string, notaId: string) {
-    await fetch(`/api/expedientes/${expedienteId}/notas/${notaId}`, { method: "DELETE" });
-    await fetchExpedientes();
-  }
+  deleteNota: async (expedienteId, notaId) => {
+    await del(`/api/expedientes/${expedienteId}/notas/${notaId}`);
+    set((s) => ({
+      expedientes: s.expedientes.map((e) =>
+        e.id === expedienteId
+          ? { ...e, notas: e.notas.filter((n) => n.id !== notaId) }
+          : e
+      ),
+    }));
+  },
 
-  // ── Documentos ──────────────────────────────────────────────────────────────
+  // ── Documentos ────────────────────────────────────────────────────────────
 
-  async function addDocumento(expedienteId: string, file: File) {
+  addDocumento: async (expedienteId, file) => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`/api/expedientes/${expedienteId}/documentos`, {
+    const res = await fetch(api(`/api/expedientes/${expedienteId}/documentos`), {
       method: "POST",
       body:   formData,
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      throw new Error(d.error ?? "Error al subir documento");
+      throw new Error((d as Record<string,string>).error ?? "Error al subir documento");
     }
-    await fetchExpedientes();
-  }
+    const doc = await res.json() as Documento;
+    set((s) => ({
+      expedientes: s.expedientes.map((e) =>
+        e.id === expedienteId
+          ? { ...e, documentos: [doc, ...e.documentos] }
+          : e
+      ),
+    }));
+  },
 
-  async function deleteDocumento(expedienteId: string, docId: string) {
-    await fetch(`/api/expedientes/${expedienteId}/documentos/${docId}`, { method: "DELETE" });
-    await fetchExpedientes();
-  }
+  deleteDocumento: async (expedienteId, docId) => {
+    await del(`/api/expedientes/${expedienteId}/documentos/${docId}`);
+    set((s) => ({
+      expedientes: s.expedientes.map((e) =>
+        e.id === expedienteId
+          ? { ...e, documentos: e.documentos.filter((d) => d.id !== docId) }
+          : e
+      ),
+    }));
+  },
+}));
 
-  return {
-    expedientes, loading,
-    addExpediente, updateExpediente, deleteExpediente,
-    addPago, deletePago,
-    addNota, deleteNota,
-    addDocumento, deleteDocumento,
-    refresh: fetchExpedientes,
-  };
+export function useExpedientesStore() {
+  const state = _expedientesStore();
+  useEffect(() => { _expedientesStore.getState()._init(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return state;
 }

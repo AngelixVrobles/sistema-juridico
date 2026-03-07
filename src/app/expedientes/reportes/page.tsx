@@ -4,6 +4,7 @@ import { ExpedientesSidebar } from "@/components/ExpedientesSidebar";
 import { Button }             from "@/components/Button";
 import { useExpedientesStore, getPaid, getPercent } from "@/store/expedientes";
 import { useToast }           from "@/context/ToastContext";
+import { useSettingsStore }   from "@/store/settings";
 
 // ─── Report config ────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ function ReportModal({ reportId, expedientes, onClose }: {
   reportId: ReportId; expedientes: Exp[]; onClose: () => void;
 }) {
   const report = REPORTS.find((r) => r.id === reportId)!;
+  const { officeName } = useSettingsStore();
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-auto p-8">
       <div className="bg-[var(--background)] border border-[var(--border)] shadow-2xl w-full max-w-5xl flex flex-col">
@@ -101,7 +103,10 @@ function ReportModal({ reportId, expedientes, onClose }: {
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${report.color}20` }}>
               <span className="icon-material-outlined" style={{ fontSize: 18, color: report.color }}>{report.icon}</span>
             </div>
-            <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">{report.title}</h2>
+            <div className="flex flex-col gap-0.5">
+              <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">{report.title}</h2>
+              <span className="font-secondary text-xs text-[var(--muted-foreground)]">{officeName}</span>
+            </div>
           </div>
           <div className="flex gap-3">
             <Button icon="print" onClick={() => window.print()}>Imprimir</Button>

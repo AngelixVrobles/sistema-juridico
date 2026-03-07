@@ -15,4 +15,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   /** Indica que estamos dentro de Electron (para feature detection) */
   isElectron: true,
+
+  /** Guarda la URL del servidor remoto en userData (multi-computadora) */
+  setRemoteUrl: (url) => ipcRenderer.invoke("set-remote-url", url),
 });
