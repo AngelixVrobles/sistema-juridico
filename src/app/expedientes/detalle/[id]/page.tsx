@@ -8,9 +8,17 @@ import { Icon }               from "@/components/Icon";
 import { Progress }           from "@/components/Progress";
 import { InputGroup }         from "@/components/InputGroup";
 import { SelectGroup }        from "@/components/SelectGroup";
+import { FilePreviewModal, type PreviewDoc } from "@/components/FilePreviewModal";
 import { useExpedientesStore, getPaid, getPercent } from "@/store/expedientes";
 import { useToast }           from "@/context/ToastContext";
 
+type ElAPI = {
+  openUploadFile?: (path: string) => Promise<{ ok: boolean; error?: string }>;
+  printFile?:      (url:  string) => Promise<{ ok: boolean; error?: string }>;
+  isElectron?:     boolean;
+};
+
+const WORD_TYPES  = new Set(["DOCX", "DOC"]);
 const statusVariant = { Activo: "success", "En Espera": "warning", Inactivo: "error" } as const;
 
 export default function DetalleExpediente() {
@@ -42,6 +50,9 @@ export default function DetalleExpediente() {
   const [savingEdit,    setSavingEdit]    = useState(false);
   const [savingPago,    setSavingPago]    = useState(false);
   const [savingNota,    setSavingNota]    = useState(false);
+
+  // ── Vista previa ──────────────────────────────────────────────────────────
+  const [previewDoc, setPreviewDoc] = useState<PreviewDoc | null>(null);
 
   // ── Loading / not found guards ───────────────────────────────────────────────
 
@@ -142,6 +153,29 @@ export default function DetalleExpediente() {
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  // ── Handlers de archivo ───────────────────────────────────────────────────
+
+  async function handleOpenInWord(filePath: string) {
+    const api = (window as Window & { electronAPI?: ElAPI }).electronAPI;
+    if (api?.openUploadFile) {
+      const res = await api.openUploadFile(filePath);
+      if (!res.ok) toast.error(`No se pudo abrir en Word: ${res.error ?? "verifica que Microsoft Word esté instalado"}`);
+    } else {
+      window.open(filePath, "_blank");
+    }
+  }
+
+  async function handlePrintDoc(filePath: string) {
+    const api = (window as Window & { electronAPI?: ElAPI }).electronAPI;
+    const fileUrl = `${window.location.origin}${filePath}`;
+    if (api?.printFile) {
+      const res = await api.printFile(fileUrl);
+      if (!res.ok) toast.error(`Error al imprimir: ${res.error ?? "desconocido"}`);
+    } else {
+      window.open(filePath, "_blank");
     }
   }
 
@@ -280,32 +314,73 @@ export default function DetalleExpediente() {
                 <p className="font-secondary text-sm text-[var(--muted-foreground)]">Sin documentos cargados.</p>
               )}
 
-              {e.documentos.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-3 py-2 border-b border-[var(--border)]">
-                  <Icon name="description" size={20} outlined className="text-[#4285F4]" />
-                  <span className="font-secondary text-sm flex-1 text-[var(--foreground)]">{doc.name}</span>
-                  <Label variant="info">{doc.type || "ARCH"}</Label>
-                  <span className="font-primary text-xs text-[var(--muted-foreground)]">{doc.size}</span>
-                  <span className="font-primary text-xs text-[var(--muted-foreground)]">{doc.uploadDate}</span>
-                  {doc.filePath && (
-                    <a
-                      href={doc.filePath}
-                      download={doc.name}
-                      className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
-                      title="Descargar documento"
+              {e.documentos.map((doc) => {
+                const isWord = WORD_TYPES.has((doc.type || "").toUpperCase());
+                const canPreview = doc.filePath;
+                return (
+                  <div key={doc.id} className="flex items-center gap-3 py-2 border-b border-[var(--border)]">
+                    <Icon name="description" size={20} outlined className="text-[#4285F4]" />
+                    <span className="font-secondary text-sm flex-1 text-[var(--foreground)]">{doc.name}</span>
+                    <Label variant="info">{doc.type || "ARCH"}</Label>
+                    <span className="font-primary text-xs text-[var(--muted-foreground)]">{doc.size}</span>
+                    <span className="font-primary text-xs text-[var(--muted-foreground)]">{doc.uploadDate}</span>
+
+                    {/* Vista previa */}
+                    {canPreview && (
+                      <button
+                        onClick={() => setPreviewDoc({ id: doc.id, name: doc.name, type: doc.type, filePath: doc.filePath })}
+                        className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                        title="Vista previa"
+                      >
+                        <Icon name="visibility" size={16} />
+                      </button>
+                    )}
+
+                    {/* Abrir en Word — solo para DOCX/DOC */}
+                    {isWord && doc.filePath && (
+                      <button
+                        onClick={() => handleOpenInWord(doc.filePath)}
+                        className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                        title="Abrir en Word"
+                      >
+                        <Icon name="open_in_new" size={16} />
+                      </button>
+                    )}
+
+                    {/* Imprimir */}
+                    {doc.filePath && !isWord && (
+                      <button
+                        onClick={() => handlePrintDoc(doc.filePath)}
+                        className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                        title="Imprimir"
+                      >
+                        <Icon name="print" size={16} />
+                      </button>
+                    )}
+
+                    {/* Descargar */}
+                    {doc.filePath && (
+                      <a
+                        href={doc.filePath}
+                        download={doc.name}
+                        className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                        title="Descargar"
+                      >
+                        <Icon name="download" size={16} />
+                      </a>
+                    )}
+
+                    {/* Eliminar */}
+                    <button
+                      onClick={() => handleDeleteDoc(doc.id, doc.name)}
+                      className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-colors"
+                      title="Eliminar documento"
                     >
-                      <Icon name="download" size={16} />
-                    </a>
-                  )}
-                  <button
-                    onClick={() => handleDeleteDoc(doc.id, doc.name)}
-                    className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-colors"
-                    title="Eliminar documento"
-                  >
-                    <Icon name="delete" size={16} />
-                  </button>
-                </div>
-              ))}
+                      <Icon name="delete" size={16} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -393,6 +468,10 @@ export default function DetalleExpediente() {
           </div>
         </div>
       </main>
+
+      {/* Modal de vista previa de documentos */}
+      <FilePreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+
     </div>
   );
 }

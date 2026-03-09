@@ -1,5 +1,5 @@
 "use client";
-import { useState }         from "react";
+import { useState, useEffect } from "react";
 import { Icon }             from "@/components/Icon";
 import { InputGroup }       from "@/components/InputGroup";
 import { SelectGroup }      from "@/components/SelectGroup";
@@ -58,6 +58,20 @@ export default function ConfiguracionPage() {
   const [darkMode,     setDarkMode]     = useState(settings.darkMode);
   const [serverUrl,    setServerUrl]    = useState(settings.serverUrl);
   const [pollInterval, setPollInterval] = useState(String(settings.pollInterval));
+
+  // ── Sincronizar formulario cuando el store de Zustand hidrata desde localStorage ──
+  // Corre UNA SOLA VEZ después del montaje. Para ese momento, el middleware persist
+  // ya leyó localStorage de forma sincrónica, por lo que getState() devuelve los
+  // valores reales. Con dependencias vacías nunca sobreescribe ediciones no guardadas.
+  useEffect(() => {
+    const s = useSettingsStore.getState();
+    setOfficeName(s.officeName);
+    setUserName(s.userName);
+    setUserRole(s.userRole);
+    setDarkMode(s.darkMode);
+    setServerUrl(s.serverUrl);
+    setPollInterval(String(s.pollInterval));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSave() {
     settings.update({
