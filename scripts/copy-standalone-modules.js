@@ -46,4 +46,16 @@ exports.default = async function afterPack({ appOutDir, packager }) {
     } else {
         console.error("[afterPack] ✗ next NO encontrado — el servidor fallará al iniciar");
     }
+
+    // Copiar el binario del motor de Prisma (.prisma/client/) que Next.js
+    // standalone NO incluye pero es necesario para que la base de datos funcione.
+    const prismaSrc = path.join(packager.projectDir, "node_modules", ".prisma", "client");
+    const prismaDst = path.join(appOutDir, "resources", "app", "node_modules", ".prisma", "client");
+    if (fs.existsSync(prismaSrc)) {
+        console.log("[afterPack] Copiando motor de Prisma (.prisma/client)...");
+        const np = copyDir(prismaSrc, prismaDst);
+        console.log(`[afterPack] ✓ Motor de Prisma copiado (${np} archivos)`);
+    } else {
+        console.error("[afterPack] ✗ .prisma/client NO encontrado — ejecuta 'npx prisma generate' antes de empaquetar");
+    }
 };
