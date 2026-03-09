@@ -65,6 +65,11 @@ win:
 # ─── macOS ────────────────────────────────────────────────────────────────────
 mac:
   icon: electron/resources/icon.icns
+  # Sin certificado Apple Developer, hardenedRuntime debe ser false
+  # para que V8 (motor JS de Electron) pueda usar el compilador JIT.
+  # Sin esto, macOS 15/26 lanza EXC_BREAKPOINT (SIGTRAP) al arrancar.
+  hardenedRuntime: false
+  gatekeeperAssess: false
   target:
     - target: dmg
       arch: [x64, arm64]
