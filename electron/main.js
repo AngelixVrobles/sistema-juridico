@@ -161,7 +161,14 @@ function startNextServer() {
 
     // Variables de entorno para el servidor
     const uploadDir = path.join(app.getPath("userData"), "uploads");
-    const enginePath = path.join(STANDALONE_DIR, "node_modules", ".prisma", "client", "query_engine-windows.dll.node");
+
+    // Nombre del binario Prisma según plataforma y arquitectura
+    const prismaEngineName = process.platform === "win32"
+      ? "query_engine-windows.dll.node"
+      : process.arch === "arm64"
+        ? "libquery_engine-darwin-arm64.dylib.node"
+        : "libquery_engine-darwin.dylib.node";
+    const enginePath = path.join(STANDALONE_DIR, "node_modules", ".prisma", "client", prismaEngineName);
 
     const env = {
       ...process.env,
@@ -170,8 +177,8 @@ function startNextServer() {
       HOSTNAME: "127.0.0.1",
       DATABASE_URL: `file:${path.join(app.getPath("userData"), "biblioteca.db")}`,
       UPLOAD_DIR: uploadDir,
-      // Ruta explícita al motor de Prisma para que funcione en cualquier PC
-      PRISMA_QUERY_ENGINE_LIBRARY: enginePath,
+      // Ruta explícita al motor de Prisma — Windows y macOS (x64 y arm64)
+      ...(fs.existsSync(enginePath) && { PRISMA_QUERY_ENGINE_LIBRARY: enginePath }),
       // Permite que Electron actúe como Node.js puro para resolución de módulos
       ELECTRON_RUN_AS_NODE: "1",
       NODE_PATH: path.join(STANDALONE_DIR, "node_modules"),

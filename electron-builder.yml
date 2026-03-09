@@ -29,10 +29,13 @@ files:
 # ─── Recursos extra (copiados a resources/) ───────────────────────────────────
 extraResources:
   # La app standalone se convierte en el "app"
+  # Se excluye .next/node_modules/ porque es caché interna de Turbopack
+  # (contiene directorios con hashes que rompen el empaquetado en macOS)
   - from: ".next/standalone"
     to: "app"
     filter:
       - "**/*"
+      - "!.next/node_modules/**"
   # DB semilla para primera ejecución
   - from: "prisma/biblioteca.db"
     to: "app/prisma/biblioteca.db"
