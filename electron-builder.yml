@@ -38,6 +38,7 @@ extraResources:
     filter:
       - "**/*"
       - "!.next/node_modules/**"
+      - "!dist-electron/**"
   # DB semilla para primera ejecución
   - from: "prisma/biblioteca.db"
     to: "app/prisma/biblioteca.db"
