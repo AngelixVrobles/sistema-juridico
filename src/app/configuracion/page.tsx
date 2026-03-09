@@ -59,26 +59,19 @@ export default function ConfiguracionPage() {
   const [serverUrl,    setServerUrl]    = useState(settings.serverUrl);
   const [pollInterval, setPollInterval] = useState(String(settings.pollInterval));
 
-  // ── Sincronizar formulario cuando el store de Zustand hidrata desde localStorage
-  // useState() captura el valor INICIAL del store, que puede ser el default (false)
-  // antes de que el middleware persist termine de leer localStorage. Este useEffect
-  // corrige el estado del formulario una vez que el store tiene los valores reales.
+  // ── Sincronizar formulario cuando el store de Zustand hidrata desde localStorage ──
+  // Corre UNA SOLA VEZ después del montaje. Para ese momento, el middleware persist
+  // ya leyó localStorage de forma sincrónica, por lo que getState() devuelve los
+  // valores reales. Con dependencias vacías nunca sobreescribe ediciones no guardadas.
   useEffect(() => {
-    setOfficeName(settings.officeName);
-    setUserName(settings.userName);
-    setUserRole(settings.userRole);
-    setDarkMode(settings.darkMode);
-    setServerUrl(settings.serverUrl);
-    setPollInterval(String(settings.pollInterval));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    settings.officeName,
-    settings.userName,
-    settings.userRole,
-    settings.darkMode,
-    settings.serverUrl,
-    settings.pollInterval,
-  ]);
+    const s = useSettingsStore.getState();
+    setOfficeName(s.officeName);
+    setUserName(s.userName);
+    setUserRole(s.userRole);
+    setDarkMode(s.darkMode);
+    setServerUrl(s.serverUrl);
+    setPollInterval(String(s.pollInterval));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSave() {
     settings.update({
