@@ -101,7 +101,9 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      // sandbox: true causa EXC_BREAKPOINT (SIGTRAP) en macOS sin
+      // certificado Apple Developer. Se desactiva para firma ad-hoc.
+      sandbox: false,
     },
     show: false, // Se mostrará cuando el contenido esté listo (ready-to-show)
   });
