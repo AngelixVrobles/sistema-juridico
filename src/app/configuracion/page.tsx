@@ -1,5 +1,5 @@
 "use client";
-import { useState }         from "react";
+import { useState, useEffect } from "react";
 import { Icon }             from "@/components/Icon";
 import { InputGroup }       from "@/components/InputGroup";
 import { SelectGroup }      from "@/components/SelectGroup";
@@ -58,6 +58,27 @@ export default function ConfiguracionPage() {
   const [darkMode,     setDarkMode]     = useState(settings.darkMode);
   const [serverUrl,    setServerUrl]    = useState(settings.serverUrl);
   const [pollInterval, setPollInterval] = useState(String(settings.pollInterval));
+
+  // ── Sincronizar formulario cuando el store de Zustand hidrata desde localStorage
+  // useState() captura el valor INICIAL del store, que puede ser el default (false)
+  // antes de que el middleware persist termine de leer localStorage. Este useEffect
+  // corrige el estado del formulario una vez que el store tiene los valores reales.
+  useEffect(() => {
+    setOfficeName(settings.officeName);
+    setUserName(settings.userName);
+    setUserRole(settings.userRole);
+    setDarkMode(settings.darkMode);
+    setServerUrl(settings.serverUrl);
+    setPollInterval(String(settings.pollInterval));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    settings.officeName,
+    settings.userName,
+    settings.userRole,
+    settings.darkMode,
+    settings.serverUrl,
+    settings.pollInterval,
+  ]);
 
   function handleSave() {
     settings.update({

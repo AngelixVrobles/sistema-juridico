@@ -54,12 +54,39 @@ const SERVER_JS = STANDALONE_DIR
   ? path.join(STANDALONE_DIR, "server.js")
   : null;
 
+// ─── Persistencia del tema (dark/light) en archivo nativo ────────────────────
+// Guardamos el tema en un JSON en userData para que el proceso principal lo lea
+// ANTES de crear la ventana y así sincronizar backgroundColor sin flash.
+
+const THEME_FILE = () => path.join(app.getPath("userData"), "juridico-theme.json");
+
+function readThemePreference() {
+  try {
+    const p = THEME_FILE();
+    if (fs.existsSync(p)) {
+      const d = JSON.parse(fs.readFileSync(p, "utf8"));
+      if (typeof d.darkMode === "boolean") return d.darkMode;
+    }
+  } catch { /* ignorar */ }
+  return false; // por defecto modo claro
+}
+
+function writeThemePreference(isDark) {
+  try {
+    fs.writeFileSync(THEME_FILE(), JSON.stringify({ darkMode: !!isDark }), "utf8");
+  } catch { /* ignorar */ }
+}
+
 // ─── Estado ───────────────────────────────────────────────────────────────────
 let mainWindow = null;
 let serverChild = null;
 
 // ─── Ventana principal ────────────────────────────────────────────────────────
 function createWindow() {
+  // Leer preferencia de tema ANTES de crear la ventana para evitar flash
+  const darkMode = readThemePreference();
+  const bgColor  = darkMode ? "#1C1C1E" : "#F2F3F0";
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -69,14 +96,14 @@ function createWindow() {
     icon: isDev
       ? path.join(__dirname, "resources", "icon.ico")
       : path.join(process.resourcesPath, "icon.ico"),
-    backgroundColor: "#0F172A",  // mismo fondo que la app
+    backgroundColor: bgColor,  // sincronizado con el tema guardado
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
-    show: false, // Se mostrará cuando el servidor esté listo
+    show: false, // Se mostrará cuando el contenido esté listo (ready-to-show)
   });
 
   // Abrir links externos en el navegador del sistema, no en Electron
@@ -287,4 +314,90 @@ ipcMain.handle("set-remote-url", (_event, url) => {
   } catch (err) {
     return { ok: false, error: String(err) };
   }
+});
+
+// ─── IPC: Guardar preferencia de tema (modo oscuro / claro) ──────────────────
+// Se llama desde ThemeProvider cada vez que el usuario cambia el tema.
+// Persiste en un archivo nativo para que createWindow() pueda leerlo al
+// arrancar y sincronizar backgroundColor antes de mostrar la ventana.
+ipcMain.handle("save-theme", (_event, isDark) => {
+  try {
+    writeThemePreference(!!isDark);
+    // Actualizar el color de fondo de la ventana actual en caliente
+    if (mainWindow) {
+      mainWindow.setBackgroundColor(isDark ? "#1C1C1E" : "#F2F3F0");
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// ─── IPC: Abrir archivo de upload en su aplicación nativa ────────────────────
+// urlPath: ruta URL relativa como "/uploads/{expId}/file.docx"
+// Resuelve al path de sistema y abre con shell.openPath (Word, visor PDF, etc.)
+ipcMain.handle("open-upload-file", async (_event, urlPath) => {
+  try {
+    const rel      = urlPath.startsWith("/") ? urlPath.slice(1) : urlPath;
+    const baseDir  = isDev ? path.join(__dirname, "..") : STANDALONE_DIR;
+    const filePath = path.join(baseDir, "public", rel);
+    const result   = await shell.openPath(filePath);
+    // shell.openPath devuelve cadena vacía en éxito, o mensaje de error
+    return result ? { ok: false, error: result } : { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// ─── IPC: Abrir diálogo para seleccionar un .docx ────────────────────────────
+// Retorna la ruta absoluta del archivo seleccionado, o { ok: false } si cancela.
+ipcMain.handle("select-docx", async () => {
+  if (!mainWindow) return { ok: false };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title:      "Seleccionar documento Word",
+    filters:    [{ name: "Documentos Word", extensions: ["docx", "doc"] }],
+    properties: ["openFile"],
+  });
+  if (result.canceled || result.filePaths.length === 0) return { ok: false };
+  return { ok: true, filePath: result.filePaths[0] };
+});
+
+// ─── IPC: Abrir archivo por ruta absoluta de sistema ─────────────────────────
+// Usado para abrir documentos Word vinculados por ruta absoluta (docPath).
+ipcMain.handle("open-file-path", async (_event, filePath) => {
+  try {
+    const result = await shell.openPath(filePath);
+    return result ? { ok: false, error: result } : { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// ─── IPC: Imprimir archivo por URL ───────────────────────────────────────────
+// Carga el archivo en una BrowserWindow oculta y lanza el diálogo de impresión.
+// fileUrl: URL completa como "http://localhost:3131/uploads/{expId}/file.pdf"
+ipcMain.handle("print-file", (_event, fileUrl) => {
+  return new Promise((resolve) => {
+    const printWin = new BrowserWindow({
+      show: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    });
+
+    printWin.loadURL(fileUrl);
+
+    printWin.webContents.once("did-finish-load", () => {
+      printWin.webContents.print(
+        { silent: false, printBackground: true },
+        (success, reason) => {
+          printWin.close();
+          resolve({ ok: success, reason: reason || "" });
+        }
+      );
+    });
+
+    printWin.webContents.on("did-fail-load", (_e, _code, desc) => {
+      printWin.close();
+      resolve({ ok: false, error: `No se pudo cargar el archivo: ${desc}` });
+    });
+  });
 });

@@ -25,8 +25,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="h-full">
+    // suppressHydrationWarning: el script bloqueante aplica data-theme en el cliente
+    // antes de que React hidrate. React ve el atributo pero el servidor no lo tiene,
+    // por lo que sin este prop lanzaría un warning de hidratación inofensivo.
+    <html lang="es" className="h-full" suppressHydrationWarning>
       <head>
+        {/* ── Script bloqueante: aplica data-theme ANTES del primer paint ── */}
+        {/* Elimina el flash blanco al iniciar en modo oscuro               */}
+        <script dangerouslySetInnerHTML={{
+          __html: `(function(){try{var s=JSON.parse(localStorage.getItem('juridico-settings')||'{}');var dm=s&&s.state&&s.state.darkMode;document.documentElement.setAttribute('data-theme',dm?'dark':'light');}catch(e){}})();`
+        }} />
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Sharp:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
           rel="stylesheet"

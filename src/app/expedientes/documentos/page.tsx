@@ -5,8 +5,17 @@ import { ExpedientesSidebar } from "@/components/ExpedientesSidebar";
 import { Button }             from "@/components/Button";
 import { Icon }               from "@/components/Icon";
 import { Label }              from "@/components/Label";
+import { FilePreviewModal, type PreviewDoc } from "@/components/FilePreviewModal";
 import { useExpedientesStore } from "@/store/expedientes";
 import { useToast }           from "@/context/ToastContext";
+
+type ElAPI = {
+  openUploadFile?: (path: string) => Promise<{ ok: boolean; error?: string }>;
+  printFile?:      (url:  string) => Promise<{ ok: boolean; error?: string }>;
+  isElectron?:     boolean;
+};
+
+const WORD_TYPES = new Set(["DOCX", "DOC"]);
 
 export default function Documentos() {
   const { expedientes, addDocumento, deleteDocumento } = useExpedientesStore();
@@ -16,6 +25,7 @@ export default function Documentos() {
   const [showUpload,     setShowUpload]     = useState(false);
   const [selectedExpId,  setSelectedExpId]  = useState("");
   const [uploading,      setUploading]      = useState(false);
+  const [previewDoc,     setPreviewDoc]     = useState<PreviewDoc | null>(null);
 
   const allDocs = expedientes.flatMap((e) =>
     e.documentos.map((d) => ({ ...d, expId: e.id, expNum: e.num, expClient: e.client }))
@@ -50,6 +60,27 @@ export default function Documentos() {
       return;
     }
     fileRef.current?.click();
+  }
+
+  async function handleOpenInWord(filePath: string) {
+    const api = (window as Window & { electronAPI?: ElAPI }).electronAPI;
+    if (api?.openUploadFile) {
+      const res = await api.openUploadFile(filePath);
+      if (!res.ok) toast.error(`No se pudo abrir en Word: ${res.error ?? "verifica que Microsoft Word esté instalado"}`);
+    } else {
+      window.open(filePath, "_blank");
+    }
+  }
+
+  async function handlePrintDoc(filePath: string) {
+    const api = (window as Window & { electronAPI?: ElAPI }).electronAPI;
+    const fileUrl = `${window.location.origin}${filePath}`;
+    if (api?.printFile) {
+      const res = await api.printFile(fileUrl);
+      if (!res.ok) toast.error(`Error al imprimir: ${res.error ?? "desconocido"}`);
+    } else {
+      window.open(filePath, "_blank");
+    }
   }
 
   async function handleDelete(expId: string, docId: string, nombre: string) {
@@ -152,7 +183,7 @@ export default function Documentos() {
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[70px]">Tipo</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[80px]">Tamaño</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[110px]">Fecha</span>
-            <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[110px]">Acciones</span>
+            <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[130px]">Acciones</span>
           </div>
 
           <div className="overflow-y-auto flex-1">
@@ -189,7 +220,41 @@ export default function Documentos() {
                   <div className="w-[70px]"><Label variant="info">{doc.type}</Label></div>
                   <span className="font-primary text-xs text-[var(--muted-foreground)] w-[80px]">{doc.size}</span>
                   <span className="font-primary text-xs text-[var(--muted-foreground)] w-[110px]">{doc.uploadDate}</span>
-                  <div className="flex gap-2 w-[110px] items-center">
+                  <div className="flex gap-2 w-[130px] items-center">
+                    {/* Vista previa */}
+                    {doc.filePath && (
+                      <button
+                        onClick={() => setPreviewDoc({ id: doc.id, name: doc.name, type: doc.type, filePath: doc.filePath })}
+                        className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                        title="Vista previa"
+                      >
+                        <Icon name="visibility" size={16} />
+                      </button>
+                    )}
+
+                    {/* Abrir en Word — solo DOCX/DOC */}
+                    {WORD_TYPES.has((doc.type || "").toUpperCase()) && doc.filePath && (
+                      <button
+                        onClick={() => handleOpenInWord(doc.filePath)}
+                        className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                        title="Abrir en Word"
+                      >
+                        <Icon name="open_in_new" size={16} />
+                      </button>
+                    )}
+
+                    {/* Imprimir — PDF e imágenes */}
+                    {doc.filePath && !WORD_TYPES.has((doc.type || "").toUpperCase()) && (
+                      <button
+                        onClick={() => handlePrintDoc(doc.filePath)}
+                        className="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-pointer transition-colors"
+                        title="Imprimir"
+                      >
+                        <Icon name="print" size={16} />
+                      </button>
+                    )}
+
+                    {/* Descargar */}
                     {doc.filePath && (
                       <a
                         href={doc.filePath}
@@ -201,6 +266,8 @@ export default function Documentos() {
                         <Icon name="download" size={16} />
                       </a>
                     )}
+
+                    {/* Eliminar */}
                     <button
                       onClick={() => handleDelete(doc.expId, doc.id, doc.name)}
                       className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] cursor-pointer transition-colors"
@@ -221,6 +288,10 @@ export default function Documentos() {
           </div>
         </div>
       </main>
+
+      {/* Modal de vista previa de documentos */}
+      <FilePreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+
     </div>
   );
 }
