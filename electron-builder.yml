@@ -21,8 +21,10 @@ files:
   - electron/preload.js
   - "!node_modules/**"
   - "!src/**"
-  - "!prisma/migrations/**"
+  - "!prisma/**"
   - "!scripts/**"
+  - "!dist-electron/**"
+  - "!.next/**"
   - "!*.ts"
   - "!*.md"
 
