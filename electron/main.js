@@ -160,17 +160,28 @@ function startNextServer() {
     }
 
     // Variables de entorno para el servidor
+    const uploadDir = path.join(app.getPath("userData"), "uploads");
+    const enginePath = path.join(STANDALONE_DIR, "node_modules", ".prisma", "client", "query_engine-windows.dll.node");
+
     const env = {
       ...process.env,
       NODE_ENV: "production",
       PORT: String(NEXT_PORT),
       HOSTNAME: "127.0.0.1",
       DATABASE_URL: `file:${path.join(app.getPath("userData"), "biblioteca.db")}`,
-      UPLOAD_DIR: path.join(app.getPath("userData"), "uploads"),
+      UPLOAD_DIR: uploadDir,
+      // Ruta explícita al motor de Prisma para que funcione en cualquier PC
+      PRISMA_QUERY_ENGINE_LIBRARY: enginePath,
       // Permite que Electron actúe como Node.js puro para resolución de módulos
       ELECTRON_RUN_AS_NODE: "1",
       NODE_PATH: path.join(STANDALONE_DIR, "node_modules"),
     };
+
+    // Crear directorio de uploads si no existe
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+      console.log(`[Uploads] Directorio creado: ${uploadDir}`);
+    }
 
     // Copiar DB si es la primera vez
     ensureDatabase(env.DATABASE_URL);
