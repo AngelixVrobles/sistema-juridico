@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Permite al motor V8 de Chromium/Electron usar compilación JIT.
+    Sin esto, macOS 13+ lanza EXC_BREAKPOINT (SIGTRAP) al arrancar.
+  -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!--
+    Permite mapear páginas de memoria como ejecutables sin firma previa.
+    Necesario para el compilador JIT de V8 y para WASM.
+  -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!--
+    Deshabilita la validación de firma de librerías dinámicas (.node, .dylib).
+    Requerido para cargar el motor nativo de Prisma (.prisma/client/*.dylib.node)
+    que no está firmado con el mismo Developer ID que el app principal.
+  -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+
+  <!--
+    Permite pasar variables de entorno de dyld al proceso.
+    Usado por Electron para controlar la carga de módulos Node nativos.
+  -->
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+
+  <!-- Conexiones de red (servidor HTTP interno de Next.js y cliente) -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+
+  <key>com.apple.security.network.server</key>
+  <true/>
+
+  <!-- Acceso de lectura/escritura a archivos seleccionados por el usuario -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+</dict>
+</plist>

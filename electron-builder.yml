@@ -68,11 +68,23 @@ win:
 # ─── macOS ────────────────────────────────────────────────────────────────────
 mac:
   icon: electron/resources/icon.icns
-  # Sin certificado Apple Developer, hardenedRuntime debe ser false
-  # para que V8 (motor JS de Electron) pueda usar el compilador JIT.
-  # Sin esto, macOS 15/26 lanza EXC_BREAKPOINT (SIGTRAP) al arrancar.
-  hardenedRuntime: false
+  #
+  # SOLUCIÓN EXC_BREAKPOINT (SIGTRAP) en macOS 13–26 sin certificado Apple:
+  #
+  # 1. hardenedRuntime: true  — mantiene HR activo (necesario en macOS 26).
+  # 2. entitlements — declara explícitamente los permisos de JIT, dylibs sin
+  #    firma, y variables de entorno que el motor V8 y Prisma necesitan.
+  #    Sin estos permisos macOS lanza SIGTRAP al intentar compilar JS con JIT.
+  # 3. gatekeeperAssess: false — impide que electron-builder ejecute spctl
+  #    (que siempre falla sin Developer ID).
+  # 4. La firma resultante es ad-hoc (sin Developer ID). El usuario deberá
+  #    abrir la app la primera vez con clic derecho → Abrir, o ejecutar:
+  #      sudo xattr -cr /Applications/Sistema\ Jurídico.app
+  #
+  hardenedRuntime: true
   gatekeeperAssess: false
+  entitlements:        "electron/resources/entitlements.mac.plist"
+  entitlementsInherit: "electron/resources/entitlements.mac.plist"
   target:
     - target: dmg
       arch: [x64, arm64]
