@@ -59,6 +59,8 @@ extraResources:
 # ─── Windows ─────────────────────────────────────────────────────────────────
 win:
   icon: electron/resources/icon.ico
+  signAndEditExecutable: false
+  forceCodeSigning: false
   target:
     - target: nsis
       arch: [x64]
