@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ExpedientesSidebar } from "@/components/ExpedientesSidebar";
 import { Button } from "@/components/Button";
+import { Icon } from "@/components/Icon";
 import { SearchBox } from "@/components/SearchBox";
 import { Label } from "@/components/Label";
 import { Progress } from "@/components/Progress";
@@ -41,12 +42,17 @@ export default function ListaExpedientes() {
       <main className="flex flex-col flex-1 gap-6 p-8 overflow-auto">
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col gap-1">
-            <h1 className="font-primary text-2xl font-bold text-[var(--foreground)]">Expedientes Juridicos</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-primary text-2xl font-bold text-[var(--foreground)]">Expedientes Juridicos</h1>
+              <a href="/" className="flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors cursor-pointer" title="Volver al Menu Principal">
+                <Icon name="home" size={20} />
+                <span className="font-secondary text-sm">Menu Principal</span>
+              </a>
+            </div>
             <p className="font-secondary text-sm text-[var(--muted-foreground)]">Gestiona todos los expedientes del bufete</p>
           </div>
           <div className="flex items-center gap-3">
             <SearchBox placeholder="Buscar expediente..." value={search} onChange={setSearch} />
-            <Button icon="home" href="/" variant="outline">Menu Principal</Button>
             <Button icon="add" href="/expedientes/nuevo">Nuevo Expediente</Button>
           </div>
         </div>

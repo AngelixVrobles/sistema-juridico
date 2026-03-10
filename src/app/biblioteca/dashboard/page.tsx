@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { BibliotecaSidebar } from "@/components/BibliotecaSidebar";
 import { Button } from "@/components/Button";
+import { Icon } from "@/components/Icon";
 import { useBibliotecaStore } from "@/store/biblioteca";
 
 export default function BibliotecaDashboard() {
@@ -34,13 +35,16 @@ export default function BibliotecaDashboard() {
       <main className="flex flex-col flex-1 gap-6 p-8 overflow-auto">
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col gap-1">
-            <h1 className="font-primary text-2xl font-semibold text-[var(--foreground)]">Panel Principal</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-primary text-2xl font-semibold text-[var(--foreground)]">Panel Principal</h1>
+              <a href="/" className="flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors cursor-pointer" title="Volver al Menu Principal">
+                <Icon name="home" size={20} />
+                <span className="font-secondary text-sm">Menu Principal</span>
+              </a>
+            </div>
             <p className="font-secondary text-sm text-[var(--muted-foreground)]">Resumen general de la biblioteca juridica</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button icon="home" href="/" variant="outline">Menu Principal</Button>
-            <Button icon="add" href="/biblioteca/catalogo">Nuevo Libro</Button>
-          </div>
+          <Button icon="add" href="/biblioteca/catalogo">Nuevo Libro</Button>
         </div>
 
         <div className="flex gap-4 w-full">
