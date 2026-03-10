@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { BibliotecaSidebar } from "@/components/BibliotecaSidebar";
 import { Button } from "@/components/Button";
@@ -7,6 +8,7 @@ import { useBibliotecaStore } from "@/store/biblioteca";
 
 export default function BibliotecaDashboard() {
   const { libros, prestamos } = useBibliotecaStore();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const totalLibros = libros.length;
   const sections = [...new Set(libros.map((l) => l.section))];
@@ -27,7 +29,15 @@ export default function BibliotecaDashboard() {
     count: libros.filter((l) => l.section === s).length,
   }));
 
-  const recentLibros = [...libros].reverse().slice(0, 5);
+  const filteredLibros = searchQuery.trim()
+    ? libros.filter((l) =>
+        l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        l.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        l.section.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : libros;
+
+  const recentLibros = [...filteredLibros].reverse().slice(0, 5);
 
   return (
     <div className="flex h-full bg-[var(--background)]">
@@ -38,7 +48,19 @@ export default function BibliotecaDashboard() {
             <h1 className="font-primary text-2xl font-semibold text-[var(--foreground)]">Panel Principal</h1>
             <p className="font-secondary text-sm text-[var(--muted-foreground)]">Resumen general de la biblioteca juridica</p>
           </div>
-          <Button icon="add" href="/biblioteca/catalogo">Nuevo Libro</Button>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Icon name="search" size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--muted-foreground)]" />
+              <input
+                type="text"
+                placeholder="Buscar libro..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 h-10 border border-[var(--input)] bg-[var(--background)] font-secondary text-sm rounded-none focus:outline-none focus:ring-1 focus:ring-[var(--primary)] w-[250px]"
+              />
+            </div>
+            <Button icon="add" href="/biblioteca/catalogo">Nuevo Libro</Button>
+          </div>
         </div>
 
         <div className="flex gap-4 w-full">

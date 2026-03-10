@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm --version)",
+      "Bash(cmd /c \"where npm\")",
+      "Bash(powershell -Command \"Get-Command npm | Select-Object -ExpandProperty Source\")",
+      "Bash(netstat -ano)",
+      "Bash(ss -tlnp)",
+      "Bash(sort -t: -k2 -n)",
+      "Bash(taskkill //F //PID 73864 //PID 75128)",
+      "Bash(npm install zustand)",
+      "Bash(git add next.config.ts package.json package-lock.json src/components/Button.tsx src/components/BibliotecaSidebar.tsx src/app/expedientes/lista/page.tsx src/app/expedientes/nuevo/page.tsx src/app/expedientes/pagos/page.tsx src/app/expedientes/clientes/page.tsx src/app/expedientes/documentos/page.tsx src/app/biblioteca/catalogo/page.tsx src/app/biblioteca/dashboard/page.tsx src/app/biblioteca/prestamos/page.tsx src/app/expedientes/detalle/ src/app/biblioteca/reportes/ src/store/ .claude/launch.json)",
+      "Bash(git commit:*)",
+      "Bash(git push -u origin master)"
+    ]
+  }
+}

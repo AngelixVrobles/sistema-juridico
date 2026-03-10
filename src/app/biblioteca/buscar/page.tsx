@@ -90,7 +90,11 @@ export default function BuscarLibro() {
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={handleClear}>Limpiar</Button>
-            <Button icon="search" onClick={() => {}}>Buscar</Button>
+            {hayFiltro && (
+              <Button icon="search" disabled className="opacity-70">
+                {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
+              </Button>
+            )}
           </div>
         </div>
 
