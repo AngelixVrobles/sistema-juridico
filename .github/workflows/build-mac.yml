@@ -21,3 +21,9 @@ jobs:
       
       - name: Build Electron app for Mac
         run: npm run electron:build:mac
+      
+      - name: Upload DMG files
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-installers
+          path: dist-electron/*.dmg
