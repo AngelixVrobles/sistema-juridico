@@ -34,7 +34,12 @@ export default function Prestamos() {
   }
 
   async function handleReturn(id: string) {
-    await returnPrestamo(id);
+    try {
+      await returnPrestamo(id);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Error al devolver el préstamo";
+      alert(message);
+    }
   }
 
   return (

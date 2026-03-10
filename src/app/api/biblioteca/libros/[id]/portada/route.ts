@@ -81,23 +81,28 @@ export async function DELETE(
   _: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  try {
+    const { id } = await params;
 
-  const libro = await prisma.libro.findUnique({
-    where: { id },
-    select: { portada: true },
-  });
-  if (!libro) return err("Libro no encontrado", 404);
+    const libro = await prisma.libro.findUnique({
+      where: { id },
+      select: { portada: true },
+    });
+    if (!libro) return err("Libro no encontrado", 404);
 
-  if (libro.portada) {
-    const filename = libro.portada.split("/").pop();
-    if (filename) {
-      try {
-        await fs.unlink(path.join(getUploadDir(), filename));
-      } catch { /* ignorar si no existe */ }
+    if (libro.portada) {
+      const filename = libro.portada.split("/").pop();
+      if (filename) {
+        try {
+          await fs.unlink(path.join(getUploadDir(), filename));
+        } catch { /* ignorar si no existe */ }
+      }
+      await prisma.libro.update({ where: { id }, data: { portada: "" } });
     }
-    await prisma.libro.update({ where: { id }, data: { portada: "" } });
-  }
 
-  return Response.json({ ok: true });
+    return Response.json({ ok: true });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Error al eliminar portada";
+    return err(message);
+  }
 }
