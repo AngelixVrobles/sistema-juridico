@@ -44,8 +44,8 @@ export function Sidebar({ title, items, backHref = "/" }: SidebarProps) {
           href={backHref}
           className="flex items-center gap-4 rounded-full px-4 py-2 w-[248px] cursor-pointer text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-accent)]/50 transition-colors mb-1"
         >
-          <Icon name="home" size={20} />
-          <span className="font-secondary text-sm text-[var(--muted-foreground)]">Menú Principal</span>
+          <Icon name="home" size={24} />
+          <span className="font-secondary text-base text-[var(--muted-foreground)]">Menú Principal</span>
         </a>
 
         <div className="h-px bg-[var(--sidebar-border)] mx-2 mb-2" />
