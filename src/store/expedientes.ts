@@ -115,14 +115,19 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(api(path), {
+  const url = api(path);
+  console.log("[postJson]", url, body);
+  const res = await fetch(url, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(body),
   });
   if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error((d as Record<string,string>).error ?? "Error en la petición");
+    const text = await res.text();
+    let errorMsg = `HTTP ${res.status}`;
+    try { const d = JSON.parse(text); errorMsg = d.error || errorMsg; } catch { errorMsg = text.slice(0, 200) || errorMsg; }
+    console.error("[postJson] ERROR:", res.status, errorMsg);
+    throw new Error(errorMsg);
   }
   return res.json();
 }
