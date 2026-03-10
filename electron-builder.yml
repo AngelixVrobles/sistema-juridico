@@ -47,6 +47,8 @@ extraResources:
     to: "app/.next/static"
   - from: ".next/standalone/public"
     to: "app/public"
+  - from: "electron/resources/icon.png"
+    to: "icon.png"
 
 # ─── Icono de la aplicación ───────────────────────────────────────────────────
 # Para personalizar el ícono, reemplaza los archivos en electron/resources/:
@@ -58,7 +60,7 @@ extraResources:
 
 # ─── Windows ─────────────────────────────────────────────────────────────────
 win:
-  icon: electron/resources/icon.ico
+  icon: electron/resources/icon.png
   signAndEditExecutable: false
   forceCodeSigning: false
   target:

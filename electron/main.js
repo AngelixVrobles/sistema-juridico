@@ -94,8 +94,8 @@ function createWindow() {
     minHeight: 600,
     title: "Sistema Jurídico",
     icon: isDev
-      ? path.join(__dirname, "resources", "icon.ico")
-      : path.join(process.resourcesPath, "icon.ico"),
+      ? path.join(__dirname, "resources", "icon.png")
+      : path.join(process.resourcesPath, "icon.png"),
     backgroundColor: bgColor,  // sincronizado con el tema guardado
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -177,7 +177,7 @@ function startNextServer() {
       NODE_ENV: "production",
       PORT: String(NEXT_PORT),
       HOSTNAME: "127.0.0.1",
-      DATABASE_URL: `file:${path.join(app.getPath("userData"), "biblioteca.db")}`,
+      DATABASE_URL: `file:${path.join(app.getPath("userData"), "biblioteca.db").replace(/\\/g, "/")}`,
       UPLOAD_DIR: uploadDir,
       // Ruta explícita al motor de Prisma — Windows y macOS (x64 y arm64)
       ...(fs.existsSync(enginePath) && { PRISMA_QUERY_ENGINE_LIBRARY: enginePath }),
