@@ -63,9 +63,9 @@ export default function Home() {
           <p className="font-secondary text-sm text-[var(--muted-foreground)] text-center w-[320px]">
             Administra tus expedientes y casos. Documentos vinculados, control de pagos, abonos, notas y seguimiento completo.
           </p>
-          <div className="flex items-center gap-2 rounded-lg bg-[#10B981] px-5 py-[10px]">
-            <Icon name="arrow_forward" size={18} outlined className="text-white" />
-            <span className="font-secondary text-sm font-semibold text-white">
+          <div className="flex items-center gap-[6px] rounded-lg bg-[var(--primary)] px-5 py-[10px]">
+            <Icon name="arrow_forward" size={18} className="text-[var(--primary-foreground)]" />
+            <span className="font-primary text-sm font-semibold text-[var(--primary-foreground)]">
               Entrar a Expedientes
             </span>
           </div>

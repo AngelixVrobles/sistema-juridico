@@ -434,13 +434,15 @@ export default function DetalleExpediente() {
             <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-6 flex flex-col gap-4">
               <h2 className="font-primary text-base font-semibold text-[var(--foreground)]">Notas</h2>
               <div className="flex gap-2">
-                <InputGroup
-                  label=""
-                  value={newNota}
-                  onChange={setNewNota}
-                  placeholder="Escribe una nota..."
-                  className="flex-1"
-                />
+                <div className="flex flex-col gap-2 flex-1">
+                  <textarea
+                    value={newNota}
+                    onChange={(e) => setNewNota(e.target.value)}
+                    placeholder="Escribe una nota..."
+                    className="font-secondary text-sm bg-[var(--background)] border border-[var(--input)] rounded-lg px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none focus:border-[var(--primary)] resize-none w-full"
+                    rows={4}
+                  />
+                </div>
                 <button
                   onClick={handleAddNota}
                   disabled={savingNota}
