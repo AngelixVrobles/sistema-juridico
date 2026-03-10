@@ -17,7 +17,7 @@
     "electron:dev": "concurrently --kill-others \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "cross-env BUILD_TARGET=electron next build && node scripts/prepare-electron.js",
     "electron:build:win": "node -e \"require('fs').rmSync('dist-electron',{recursive:true,force:true})\" && npm run electron:build && electron-builder --win",
-    "electron:build:mac": "node -e \"require('fs').rmSync('dist-electron',{recursive:true,force:true})\" && npm run electron:build && electron-builder --mac",
+    "electron:build:mac": "node -e \"require('fs').rmSync('dist-electron',{recursive:true,force:true})\" && npm run electron:build && electron-builder --mac --publish never",
     "electron:preview": "cross-env NODE_ENV=production electron ."
   },
   "prisma": {
