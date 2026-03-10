@@ -17,7 +17,7 @@ const variantClasses: Record<LabelVariant, string> = {
 export function Label({ variant = "secondary", children, className = "" }: LabelProps) {
   return (
     <span
-      className={`font-primary inline-flex items-center justify-center gap-1 rounded-full px-2 py-2 text-sm leading-[1.14] ${variantClasses[variant]} ${className}`}
+      className={`font-primary inline-flex items-center justify-center gap-1 rounded-full px-3 py-1.5 text-xs whitespace-nowrap leading-[1.14] ${variantClasses[variant]} ${className}`}
     >
       {children}
     </span>

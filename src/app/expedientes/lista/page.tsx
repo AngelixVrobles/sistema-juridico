@@ -42,13 +42,7 @@ export default function ListaExpedientes() {
       <main className="flex flex-col flex-1 gap-6 p-8 overflow-auto">
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
-              <h1 className="font-primary text-2xl font-bold text-[var(--foreground)]">Expedientes Juridicos</h1>
-              <a href="/" className="flex items-center gap-1 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors cursor-pointer" title="Volver al Menu Principal">
-                <Icon name="home" size={20} />
-                <span className="font-secondary text-sm">Menu Principal</span>
-              </a>
-            </div>
+            <h1 className="font-primary text-2xl font-bold text-[var(--foreground)]">Expedientes Juridicos</h1>
             <p className="font-secondary text-sm text-[var(--muted-foreground)]">Gestiona todos los expedientes del bufete</p>
           </div>
           <div className="flex items-center gap-3">
@@ -79,7 +73,7 @@ export default function ListaExpedientes() {
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] flex-1">Cliente</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[170px]">Juzgado</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[120px]">Abogado</span>
-            <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[90px]">Estado</span>
+            <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[110px]">Estado</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[120px]">Pago</span>
             <span className="font-primary text-xs font-semibold text-[var(--muted-foreground)] w-[40px]"></span>
           </div>
@@ -101,7 +95,7 @@ export default function ListaExpedientes() {
                     <span className="font-secondary text-[13px] font-medium text-[var(--foreground)] flex-1">{e.client}</span>
                     <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[170px]">{e.court}</span>
                     <span className="font-secondary text-xs text-[var(--muted-foreground)] w-[120px]">{e.lawyer}</span>
-                    <div className="w-[90px]"><Label variant={statusVariant[e.status]}>{e.status}</Label></div>
+                    <div className="w-[110px]"><Label variant={statusVariant[e.status]}>{e.status}</Label></div>
                     <div className="flex items-center gap-2 w-[120px]">
                       <Progress value={pct} className="w-[70px]" />
                       <span className="font-primary text-xs text-[var(--foreground)]">{pct}%</span>
