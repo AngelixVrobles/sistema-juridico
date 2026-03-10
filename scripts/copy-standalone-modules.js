@@ -49,13 +49,23 @@ exports.default = async function afterPack({ appOutDir, packager }) {
 
     // Copiar el binario del motor de Prisma (.prisma/client/) que Next.js
     // standalone NO incluye pero es necesario para que la base de datos funcione.
-    const prismaSrc = path.join(packager.projectDir, "node_modules", ".prisma", "client");
-    const prismaDst = path.join(appOutDir, "resources", "app", "node_modules", ".prisma", "client");
-    if (fs.existsSync(prismaSrc)) {
+    const prismaEngineSrc = path.join(packager.projectDir, "node_modules", ".prisma", "client");
+    const prismaEngineDst = path.join(appOutDir, "resources", "app", "node_modules", ".prisma", "client");
+    if (fs.existsSync(prismaEngineSrc)) {
         console.log("[afterPack] Copiando motor de Prisma (.prisma/client)...");
-        const np = copyDir(prismaSrc, prismaDst);
+        const np = copyDir(prismaEngineSrc, prismaEngineDst);
         console.log(`[afterPack] ✓ Motor de Prisma copiado (${np} archivos)`);
     } else {
         console.error("[afterPack] ✗ .prisma/client NO encontrado — ejecuta 'npx prisma generate' antes de empaquetar");
+    }
+
+    // Copiar también el paquete @prisma/client completo desde el root, ya que el de
+    // standalone a veces viene incompleto por el tree-shaking de Next.js/Turbopack.
+    const prismaClientSrc = path.join(packager.projectDir, "node_modules", "@prisma", "client");
+    const prismaClientDst = path.join(appOutDir, "resources", "app", "node_modules", "@prisma", "client");
+    if (fs.existsSync(prismaClientSrc)) {
+        console.log("[afterPack] Copiando @prisma/client completo...");
+        copyDir(prismaClientSrc, prismaClientDst);
+        console.log("[afterPack] ✓ @prisma/client copiado con éxito");
     }
 };
