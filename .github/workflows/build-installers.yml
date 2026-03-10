@@ -1,0 +1,60 @@
+name: Build Installers (Windows & Mac)
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron app for Windows
+        run: npm run electron:build:win
+        env:
+          CSC_LINK: ""
+          CSC_KEY_PASSWORD: ""
+          WIN_CSC_LINK: ""
+          WIN_CSC_KEY_PASSWORD: ""
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            dist-electron/*.exe
+            dist-electron/*.msi
+
+  build-mac:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron app for Mac
+        run: npm run electron:build:mac
+
+      - name: Upload Mac installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-installers
+          path: dist-electron/*.dmg
