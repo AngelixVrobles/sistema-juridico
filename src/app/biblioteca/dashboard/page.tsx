@@ -37,7 +37,10 @@ export default function BibliotecaDashboard() {
             <h1 className="font-primary text-2xl font-semibold text-[var(--foreground)]">Panel Principal</h1>
             <p className="font-secondary text-sm text-[var(--muted-foreground)]">Resumen general de la biblioteca juridica</p>
           </div>
-          <Button icon="add" href="/biblioteca/catalogo">Nuevo Libro</Button>
+          <div className="flex items-center gap-3">
+            <Button icon="home" href="/" variant="outline">Menu Principal</Button>
+            <Button icon="add" href="/biblioteca/catalogo">Nuevo Libro</Button>
+          </div>
         </div>
 
         <div className="flex gap-4 w-full">

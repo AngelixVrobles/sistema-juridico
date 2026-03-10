@@ -46,6 +46,7 @@ export default function ListaExpedientes() {
           </div>
           <div className="flex items-center gap-3">
             <SearchBox placeholder="Buscar expediente..." value={search} onChange={setSearch} />
+            <Button icon="home" href="/" variant="outline">Menu Principal</Button>
             <Button icon="add" href="/expedientes/nuevo">Nuevo Expediente</Button>
           </div>
         </div>
