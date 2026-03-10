@@ -40,8 +40,8 @@ export default function NuevoExpediente() {
         quote: parseFloat(quote), advance: parseFloat(advance) || 0, paymentMethod,
       });
       router.push("/expedientes/lista");
-    } catch {
-      setError("Error al crear el expediente. Intenta de nuevo.");
+    } catch (e: unknown) {
+      setError((e as Error).message || "Error al crear el expediente. Intenta de nuevo.");
       setSaving(false);
     }
   }

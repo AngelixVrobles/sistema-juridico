@@ -40,39 +40,54 @@ function toExpediente(e: {
 }
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const exp = await prisma.expediente.findUnique({ where: { id }, include: INCLUDE });
-  if (!exp) return err("Expediente no encontrado", 404);
-  return Response.json(toExpediente(exp));
+  try {
+    const { id } = await params;
+    const exp = await prisma.expediente.findUnique({ where: { id }, include: INCLUDE });
+    if (!exp) return err("Expediente no encontrado", 404);
+    return Response.json(toExpediente(exp));
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Error al obtener el expediente";
+    return err(message, 500);
+  }
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const body = await req.json();
+  try {
+    const { id } = await params;
+    const body = await req.json();
 
-  const exp = await prisma.expediente.update({
-    where: { id },
-    data: {
-      ...(body.client        !== undefined && { cliente:         body.client.trim() }),
-      ...(body.clientPhone   !== undefined && { clienteTelefono: body.clientPhone.trim() }),
-      ...(body.clientEmail   !== undefined && { clienteEmail:    body.clientEmail.trim() }),
-      ...(body.court         !== undefined && { juzgado:         body.court.trim() }),
-      ...(body.lawyer        !== undefined && { abogado:         body.lawyer.trim() }),
-      ...(body.counterpart   !== undefined && { contraparte:     body.counterpart.trim() }),
-      ...(body.description   !== undefined && { descripcion:     body.description.trim() }),
-      ...(body.type          !== undefined && { tipo:            body.type.trim() }),
-      ...(body.status        !== undefined && { estado:          body.status }),
-      ...(body.quote         !== undefined && { cotizacion:      Number(body.quote) }),
-      ...(body.paymentMethod !== undefined && { metodoPago:      body.paymentMethod.trim() }),
-    },
-    include: INCLUDE,
-  });
+    const exp = await prisma.expediente.update({
+      where: { id },
+      data: {
+        ...(body.client        !== undefined && { cliente:         body.client.trim() }),
+        ...(body.clientPhone   !== undefined && { clienteTelefono: body.clientPhone.trim() }),
+        ...(body.clientEmail   !== undefined && { clienteEmail:    body.clientEmail.trim() }),
+        ...(body.court         !== undefined && { juzgado:         body.court.trim() }),
+        ...(body.lawyer        !== undefined && { abogado:         body.lawyer.trim() }),
+        ...(body.counterpart   !== undefined && { contraparte:     body.counterpart.trim() }),
+        ...(body.description   !== undefined && { descripcion:     body.description.trim() }),
+        ...(body.type          !== undefined && { tipo:            body.type.trim() }),
+        ...(body.status        !== undefined && { estado:          body.status }),
+        ...(body.quote         !== undefined && { cotizacion:      Number(body.quote) }),
+        ...(body.paymentMethod !== undefined && { metodoPago:      body.paymentMethod.trim() }),
+      },
+      include: INCLUDE,
+    });
 
-  return Response.json(toExpediente(exp));
+    return Response.json(toExpediente(exp));
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Error al actualizar el expediente";
+    return err(message, 500);
+  }
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  await prisma.expediente.delete({ where: { id } });
-  return Response.json({ ok: true });
+  try {
+    const { id } = await params;
+    await prisma.expediente.delete({ where: { id } });
+    return Response.json({ ok: true });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Error al eliminar el expediente";
+    return err(message, 500);
+  }
 }

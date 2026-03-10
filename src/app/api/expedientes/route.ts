@@ -40,64 +40,74 @@ const INCLUDE = {
 };
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const estado = searchParams.get("estado");
-  const q      = searchParams.get("q");
+  try {
+    const { searchParams } = new URL(req.url);
+    const estado = searchParams.get("estado");
+    const q      = searchParams.get("q");
 
-  const expedientes = await prisma.expediente.findMany({
-    where: {
-      ...(estado && estado !== "Todos" && { estado }),
-      ...(q && {
-        OR: [
-          { cliente: { contains: q } },
-          { numero:  { contains: q } },
-        ],
-      }),
-    },
-    include: INCLUDE,
-    orderBy: { createdAt: "desc" },
-  });
+    const expedientes = await prisma.expediente.findMany({
+      where: {
+        ...(estado && estado !== "Todos" && { estado }),
+        ...(q && {
+          OR: [
+            { cliente: { contains: q } },
+            { numero:  { contains: q } },
+          ],
+        }),
+      },
+      include: INCLUDE,
+      orderBy: { createdAt: "desc" },
+    });
 
-  return Response.json(expedientes.map(toExpediente));
+    return Response.json(expedientes.map(toExpediente));
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Error al obtener expedientes";
+    return err(message, 500);
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const {
-    client, clientPhone = "", clientEmail = "",
-    court = "", lawyer = "", counterpart = "",
-    description = "", type, status = "Activo",
-    quote = 0, advance = 0, paymentMethod = "",
-  } = body;
+  try {
+    const body = await req.json();
+    const {
+      client, clientPhone = "", clientEmail = "",
+      court = "", lawyer = "", counterpart = "",
+      description = "", type, status = "Activo",
+      quote = 0, advance = 0, paymentMethod = "",
+    } = body;
 
-  if (!client?.trim() || !type?.trim()) return err("Cliente y tipo son requeridos");
+    if (!client?.trim() || !type?.trim()) return err("Cliente y tipo son requeridos");
 
-  const year  = new Date().getFullYear();
-  const count = await prisma.expediente.count({
-    where: { createdAt: { gte: new Date(`${year}-01-01`), lt: new Date(`${year + 1}-01-01`) } },
-  });
-  const numero = `EXP-${year}-${String(count + 1).padStart(3, "0")}`;
+    const year  = new Date().getFullYear();
+    const count = await prisma.expediente.count({
+      where: { createdAt: { gte: new Date(`${year}-01-01`), lt: new Date(`${year + 1}-01-01`) } },
+    });
+    const numero = `EXP-${year}-${String(count + 1).padStart(3, "0")}`;
 
-  const expediente = await prisma.expediente.create({
-    data: {
-      numero,
-      cliente:         client.trim(),
-      clienteTelefono: clientPhone.trim(),
-      clienteEmail:    clientEmail.trim(),
-      juzgado:         court.trim(),
-      abogado:         lawyer.trim(),
-      contraparte:     counterpart.trim(),
-      descripcion:     description.trim(),
-      tipo:            type.trim(),
-      estado:          status,
-      cotizacion:      Number(quote),
-      metodoPago:      paymentMethod.trim(),
-      ...(advance > 0 && {
-        pagos: { create: [{ descripcion: "Anticipo", monto: Number(advance) }] },
-      }),
-    },
-    include: INCLUDE,
-  });
+    const expediente = await prisma.expediente.create({
+      data: {
+        numero,
+        cliente:         client.trim(),
+        clienteTelefono: clientPhone.trim(),
+        clienteEmail:    clientEmail.trim(),
+        juzgado:         court.trim(),
+        abogado:         lawyer.trim(),
+        contraparte:     counterpart.trim(),
+        descripcion:     description.trim(),
+        tipo:            type.trim(),
+        estado:          status,
+        cotizacion:      Number(quote),
+        metodoPago:      paymentMethod.trim(),
+        ...(advance > 0 && {
+          pagos: { create: [{ descripcion: "Anticipo", monto: Number(advance) }] },
+        }),
+      },
+      include: INCLUDE,
+    });
 
-  return Response.json(toExpediente(expediente), { status: 201 });
+    return Response.json(toExpediente(expediente), { status: 201 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Error al crear el expediente";
+    return err(message, 500);
+  }
 }
